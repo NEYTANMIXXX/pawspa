@@ -8,12 +8,19 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 
 import LoginPage       from './pages/LoginPage';
 import RegisterPage    from './pages/RegisterPage';
+import VerifyEmailPage from './pages/VerifyEmailPage';
+import TwoFactorPage   from './pages/TwoFactorPage';
+import TwoFactorSetupPage from './pages/TwoFactorSetupPage';
 import DashboardPage   from './pages/DashboardPage';
 import MascotasPage    from './pages/MascotasPage';
 import ReservasPage    from './pages/ReservasPage';
+import PagosPage       from './pages/PagosPage';
 import UsuariosPage    from './pages/UsuariosPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import GroomingPage    from './pages/GroomingPage';
 import Layout          from './components/layout/Layout';
+import ChangePasswordPage from './pages/ChangePasswordPage';
 
 // Ruta protegida genérica
 const RutaProtegida = ({ children, roles }) => {
@@ -30,13 +37,20 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/login"    element={usuario ? <Navigate to="/dashboard" /> : <LoginPage />} />
       <Route path="/registro" element={usuario ? <Navigate to="/dashboard" /> : <RegisterPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/two-factor" element={<TwoFactorPage />} />
+      <Route path="/forgot-password" element={usuario ? <Navigate to="/dashboard" /> : <ForgotPasswordPage />}/>
+      <Route path="/reset-password"element={<ResetPasswordPage />}/>
       <Route path="/" element={<RutaProtegida><Layout /></RutaProtegida>}>
         <Route index element={<Navigate to="/dashboard" />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="mascotas"  element={<MascotasPage />} />
         <Route path="reservas"  element={<ReservasPage />} />
+        <Route path="pagos"     element={<RutaProtegida roles={['admin','recepcion']}><PagosPage /></RutaProtegida>} />
         <Route path="grooming"  element={<RutaProtegida roles={['admin','groomer','recepcion']}><GroomingPage /></RutaProtegida>} />
         <Route path="usuarios"  element={<RutaProtegida roles={['admin']}><UsuariosPage /></RutaProtegida>} />
+        <Route path="two-factor-setup" element={<RutaProtegida roles={['admin']}><TwoFactorSetupPage /></RutaProtegida>} />
+        <Route path="change-password" element={<ChangePasswordPage />}/>
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" />} />
     </Routes>

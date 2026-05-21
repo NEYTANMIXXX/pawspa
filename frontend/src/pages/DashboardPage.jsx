@@ -42,7 +42,7 @@ export default function DashboardPage() {
               { icon:'🧑‍🤝‍🧑', value: stats.clientes,       label:'Clientes',          color:'rgba(97,175,239,0.15)' },
               { icon:'🐾', value: stats.mascotas,        label:'Mascotas',           color:'rgba(92,219,149,0.15)' },
               { icon:'📅', value: stats.reservasHoy,     label:'Citas hoy',          color:'rgba(229,192,123,0.15)' },
-              { icon:'💰', value: `S/ ${stats.ingresosDelMes}`, label:'Ingresos del mes', color:'rgba(92,219,149,0.15)' },
+              { icon:'💰', value: `Bs./ ${stats.ingresosDelMes}`, label:'Ingresos del mes', color:'rgba(92,219,149,0.15)' },
             ].map((s, i) => (
               <div key={i} className="stat-card">
                 <div className="stat-icon" style={{background:s.color}}>{s.icon}</div>

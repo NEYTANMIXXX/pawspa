@@ -19,7 +19,7 @@ r.get('/stats', async (req, res, next) => {
           .gte('fecha_inicio', new Date().toISOString().split('T')[0])
           .lt('fecha_inicio', new Date(Date.now() + 86400000).toISOString().split('T')[0])
           .not('estado', 'in', '("cancelada","no_show")'),
-        supabaseAdmin.from('pago_factura').select('total').eq('estado', 'pagado')
+        supabaseAdmin.from('pago_factura').select('total').in('estado', ['pagado', 'verificado'])
           .gte('creado_en', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
         supabaseAdmin.from('producto').select('id,nombre,stock_actual,stock_minimo').filter('stock_actual', 'lte', 'stock_minimo').eq('activo', true),
       ]);

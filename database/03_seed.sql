@@ -10,14 +10,14 @@
 -- USUARIOS DEMO (auth_id se actualiza post-registro en Supabase)
 -- ============================================================
 
-INSERT INTO usuarios (id, email, nombre, apellido, telefono, rol, activo) VALUES
-    ('a1000000-0000-0000-0000-000000000001', 'admin@pawspa.com',      'Carlos',   'Administrador', '999-000-001', 'admin',     TRUE),
-    ('a1000000-0000-0000-0000-000000000002', 'recepcion@pawspa.com',  'María',    'Recepción',     '999-000-002', 'recepcion', TRUE),
-    ('a1000000-0000-0000-0000-000000000003', 'groomer1@pawspa.com',   'Lucía',    'García',        '999-000-003', 'groomer',   TRUE),
-    ('a1000000-0000-0000-0000-000000000004', 'groomer2@pawspa.com',   'Pedro',    'Ramírez',       '999-000-004', 'groomer',   TRUE),
-    ('a1000000-0000-0000-0000-000000000005', 'cliente1@pawspa.com',   'Ana',      'Torres',        '999-000-005', 'cliente',   TRUE),
-    ('a1000000-0000-0000-0000-000000000006', 'cliente2@pawspa.com',   'Roberto',  'Mendoza',       '999-000-006', 'cliente',   TRUE),
-    ('a1000000-0000-0000-0000-000000000007', 'cliente3@pawspa.com',   'Sofía',    'López',         '999-000-007', 'cliente',   TRUE);
+INSERT INTO usuarios (id, email, nombre, apellido, telefono, rol, activo, email_verificado, email_verificado_en) VALUES
+    ('a1000000-0000-0000-0000-000000000001', 'admin@pawspa.com',      'Carlos',   'Administrador', '999-000-001', 'admin',     TRUE, TRUE, NOW()),
+    ('a1000000-0000-0000-0000-000000000002', 'recepcion@pawspa.com',  'María',    'Recepción',     '999-000-002', 'recepcion', TRUE, TRUE, NOW()),
+    ('a1000000-0000-0000-0000-000000000003', 'groomer1@pawspa.com',   'Lucía',    'García',        '999-000-003', 'groomer',   TRUE, TRUE, NOW()),
+    ('a1000000-0000-0000-0000-000000000004', 'groomer2@pawspa.com',   'Pedro',    'Ramírez',       '999-000-004', 'groomer',   TRUE, TRUE, NOW()),
+    ('a1000000-0000-0000-0000-000000000005', 'cliente1@pawspa.com',   'Ana',      'Torres',        '999-000-005', 'cliente',   TRUE, TRUE, NOW()),
+    ('a1000000-0000-0000-0000-000000000006', 'cliente2@pawspa.com',   'Roberto',  'Mendoza',       '999-000-006', 'cliente',   TRUE, TRUE, NOW()),
+    ('a1000000-0000-0000-0000-000000000007', 'cliente3@pawspa.com',   'Sofía',    'López',         '999-000-007', 'cliente',   TRUE, TRUE, NOW());
 
 -- ============================================================
 -- CLIENTES DEMO
@@ -68,20 +68,15 @@ INSERT INTO mascotas (id, cliente_id, nombre, especie, raza, fecha_nacimiento, s
 
 INSERT INTO servicios (id, nombre, descripcion, duracion_min, precio_base, aplica_tamano,
                         precio_mini, precio_pequeno, precio_mediano, precio_grande, precio_gigante, categoria) VALUES
-    ('s1000000-0000-0000-0000-000000000001', 'Baño y Secado', 'Baño completo con shampoo + secado profesional', 60,
+    ('s1000000-0000-0000-0000-000000000001', 'Baño rápido', 'Baño rápido con shampoo estándar + secado básico', 30,
+     25.00, TRUE, 20.00, 25.00, 35.00, 45.00, 60.00, 'Higiene'),
+    ('s1000000-0000-0000-0000-000000000002', 'Baño completo', 'Baño completo con shampoo premium + secado profesional', 60,
      40.00, TRUE, 35.00, 40.00, 55.00, 70.00, 90.00, 'Higiene'),
-    ('s1000000-0000-0000-0000-000000000002', 'Corte de Pelo', 'Corte estético según raza y preferencia del dueño', 90,
+    ('s1000000-0000-0000-0000-000000000003', 'Corte y peinado', 'Corte estético según raza y preferencia del dueño', 90,
      50.00, TRUE, 45.00, 50.00, 65.00, 80.00, 110.00, 'Estética'),
-    ('s1000000-0000-0000-0000-000000000003', 'Baño + Corte + Secado', 'Servicio completo de grooming', 120,
-     80.00, TRUE, 70.00, 80.00, 100.00, 130.00, 170.00, 'Paquete'),
-    ('s1000000-0000-0000-0000-000000000004', 'Spa Canino Relajante', 'Masajes, aromaterapia y tratamiento de pelaje', 90,
-     90.00, FALSE, NULL, NULL, NULL, NULL, NULL, 'Spa'),
-    ('s1000000-0000-0000-0000-000000000005', 'Corte de Uñas', 'Lima y corte seguro de uñas', 20,
-     15.00, FALSE, NULL, NULL, NULL, NULL, NULL, 'Higiene'),
-    ('s1000000-0000-0000-0000-000000000006', 'Limpieza de Oídos', 'Limpieza profunda y segura de oídos', 20,
-     15.00, FALSE, NULL, NULL, NULL, NULL, NULL, 'Higiene'),
-    ('s1000000-0000-0000-0000-000000000007', 'Tratamiento Antipulgas', 'Baño medicado antipulgas y garrapatas', 60,
-     55.00, TRUE, 45.00, 55.00, 70.00, 90.00, 120.00, 'Salud');
+    ('s1000000-0000-0000-0000-000000000004', 'Servicio completo', 'Servicio completo de grooming: baño + corte + secado + peinado', 120,
+     80.00, TRUE, 70.00, 80.00, 100.00, 130.00, 170.00, 'Paquete');
+
 
 -- ============================================================
 -- DISPONIBILIDAD DE GROOMERS (Lun-Sab 9am-6pm)
@@ -186,7 +181,7 @@ INSERT INTO producto (id, categoria_id, nombre, descripcion, marca, precio_compr
 INSERT INTO pago_factura (cliente_id, slot_id, subtotal, total, tipo_pago, estado, fecha_pago) VALUES
     ('c1000000-0000-0000-0000-000000000003',
      'r1000000-0000-0000-0000-000000000003',
-     40.00, 40.00, 'efectivo', 'pagado', NOW() - INTERVAL '3 days' + INTERVAL '10 hours');
+    40.00, 40.00, 'efectivo', 'verificado', NOW() - INTERVAL '3 days' + INTERVAL '10 hours');
 
 -- ============================================================
 -- NOTIFICACIONES DEMO

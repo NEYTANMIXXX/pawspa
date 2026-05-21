@@ -17,6 +17,8 @@ const reservasRoutes    = require('./routes/reservas.routes');
 const groomingRoutes    = require('./routes/grooming.routes');
 const productosRoutes   = require('./routes/productos.routes');
 const dashboardRoutes   = require('./routes/dashboard.routes');
+const groomersRoutes = require('./routes/groomers.routes');
+const disponibilidadRoutes = require('./routes/disponibilidad.routes');
 
 const app = express();
 
@@ -57,8 +59,11 @@ app.use('/api/mascotas',   mascotasRoutes);
 app.use('/api/servicios',  serviciosRoutes);
 app.use('/api/reservas',   reservasRoutes);
 app.use('/api/grooming',   groomingRoutes);
+app.use('/api/groomers', groomersRoutes);
 app.use('/api/productos',  productosRoutes);
 app.use('/api/dashboard',  dashboardRoutes);
+app.use('/api/disponibilidad', disponibilidadRoutes);
+
 
 // ── Manejo de errores global ────────────────────────────────
 app.use((err, req, res, next) => {

@@ -31,13 +31,47 @@ router.get('/:id', autorizar('admin','recepcion'), async (req, res, next) => {
 router.post('/', autorizar('admin'), async (req, res, next) => {
   try {
     const { nombre, apellido, email, password, telefono, rol = 'cliente' } = req.body;
-    const { data: auth, error: ae } = await supabaseAdmin.auth.admin.createUser({ email, password, email_confirm: true });
-    if (ae) return res.status(400).json({ error: ae.message });
+    
+    // Reintentar si hay error de rate limit
+    let auth, authError;
+    let intentos = 0;
+    const maxIntentos = 5;
+    
+    while (intentos < maxIntentos) {
+      try {
+        const response = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+          redirectTo: `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password`
+        });
+        auth = response.data;
+        authError = response.error;
+        
+        if (!authError) {
+          break; // Éxito, salir del loop
+        }
+      } catch (e) {
+        authError = { message: e.message };
+      }
+      
+      // Si hay error de rate limit, reintentar
+      if (authError && (authError.message?.toLowerCase().includes('rate') || authError.message?.toLowerCase().includes('too many'))) {
+        intentos++;
+        if (intentos < maxIntentos) {
+          // Esperar más tiempo (3-5 segundos progresivamente)
+          const delay = 5000 + (intentos * 1000);
+          console.log(`Rate limit en ${email}, reintentando en ${delay}ms (intento ${intentos}/${maxIntentos})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      } else {
+        break; // Si no es rate limit, salir
+      }
+    }
+    
+    if (authError) return res.status(400).json({ error: authError.message });
     const { data, error } = await supabaseAdmin.from('usuarios').insert({ auth_id: auth.user.id, email, nombre, apellido, telefono, rol }).select().single();
     if (error) throw error;
     if (rol === 'cliente') await supabaseAdmin.from('clientes').insert({ usuario_id: data.id });
     if (rol === 'groomer') await supabaseAdmin.from('groomers').insert({ usuario_id: data.id });
-    res.status(201).json({ mensaje: 'Usuario creado.', data });
+    res.status(201).json({ mensaje: 'Usuario creado. Se envió un correo de invitación.', data });
   } catch (e) { next(e); }
 });
 

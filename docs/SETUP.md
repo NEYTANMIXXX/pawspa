@@ -39,7 +39,9 @@
 **Flujo de autenticación:**
 ```
 Cliente → Login → Backend valida con Supabase Auth
-       → JWT generado con HS256 → Almacenado en localStorage
+  → Si falta verificación de email, redirige a /verify-email
+  → Si 2FA está activo, redirige a /two-factor
+  → JWT generado con HS256 → Almacenado en localStorage
        → Cada request lleva Bearer token → Middleware verifica
        → RLS en Supabase filtra datos según rol
 ```
@@ -143,6 +145,12 @@ FRONTEND_URL=http://localhost:3000
 BCRYPT_ROUNDS=12
 MAX_LOGIN_ATTEMPTS=5
 LOCKOUT_MINUTES=15
+SMTP_HOST=smtp.tu-proveedor.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=tu_correo@dominio.com
+SMTP_PASS=tu_password_smtp
+SMTP_FROM=PawSpa <tu_correo@dominio.com>
 ```
 
 ```bash
@@ -219,6 +227,58 @@ Content-Type: application/json
     "apellido": "Administrador",
     "rol": "admin"
   }
+}
+```
+
+**Si la cuenta aún no fue verificada:**
+```json
+{
+  "error": "Debes verificar tu correo antes de iniciar sesión.",
+  "requiereVerificacion": true
+}
+```
+
+**Si el usuario tiene 2FA activo:**
+```json
+{
+  "pendiente2fa": true,
+  "tokenTemporal": "eyJhbGci...",
+  "mensaje": "Verifica tu código de autenticación"
+}
+```
+
+### Registro
+```http
+POST http://localhost:4000/api/auth/registro
+Content-Type: application/json
+
+{
+  "nombre": "Ana",
+  "apellido": "Torres",
+  "email": "ana@email.com",
+  "password": "Ana1234!",
+  "telefono": "999-000-000"
+}
+```
+
+### Verificar email
+```http
+POST http://localhost:4000/api/auth/email/verify
+Content-Type: application/json
+
+{
+  "token": "eyJhbGci..."
+}
+```
+
+### Completar 2FA
+```http
+POST http://localhost:4000/api/auth/2fa/verify-login
+Content-Type: application/json
+
+{
+  "token": "eyJhbGci...",
+  "codigo": "123456"
 }
 ```
 

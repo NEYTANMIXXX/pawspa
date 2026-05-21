@@ -7,14 +7,32 @@ import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
 
 function ModalAbrirFicha({ reservas, onClose, onSaved }) {
-  const [form, setForm] = useState({ slot_id:'', observaciones_ini:'' });
+  const [form, setForm] = useState({ slot_id:'', observaciones_ini:'', estado_pelaje:'', incidentes:'', plantilla_id: '' });
   const [loading, setLoading] = useState(false);
+  const [plantillas, setPlantillas] = useState([]);
+
+  useEffect(() => {
+    let mounted = true;
+    api.get('/grooming/checklist-templates').then(r => { if (mounted) setPlantillas(r.data.data || []); }).catch(() => { if (mounted) setPlantillas([]); });
+    return () => { mounted = false; };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post('/grooming/ficha', form);
+      const payload = { ...form };
+      const resp = await api.post('/grooming/ficha', payload);
+      const ficha = resp.data.data;
+      // Si se seleccionó plantilla, poblar checklist
+      if (form.plantilla_id) {
+        const plantilla = plantillas.find(p => p.id === form.plantilla_id);
+        if (plantilla && plantilla.items && plantilla.items.length) {
+          await api.post(`/grooming/ficha/${ficha.id}/checklist`, {
+            items: plantilla.items.map(desc => ({ descripcion: desc }))
+          });
+        }
+      }
       toast.success('Ficha abierta ✅');
       onSaved();
     } catch (err) { toast.error(err.response?.data?.error || 'Error'); }
@@ -42,10 +60,35 @@ function ModalAbrirFicha({ reservas, onClose, onSaved }) {
               </select>
             </div>
             <div className="form-group">
+              <label className="form-label">Plantilla de checklist</label>
+              <select className="form-control" value={form.plantilla_id} onChange={e => setForm(p=>({...p,plantilla_id:e.target.value}))}>
+                <option value="">— Ninguna —</option>
+                {plantillas.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Estado del pelaje</label>
+              <select className="form-control" value={form.estado_pelaje} onChange={e => setForm(p=>({...p,estado_pelaje:e.target.value}))}>
+                <option value="">— Seleccionar estado —</option>
+                <option value="bueno">Bueno</option>
+                <option value="regular">Regular</option>
+                <option value="malo">Malo</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Incidentes iniciales</label>
+              <textarea className="form-control" rows={2} value={form.incidentes}
+                onChange={e => setForm(p=>({...p,incidentes:e.target.value}))}
+                placeholder="Heridas, contracciones, agresividad, alergias..." />
+            </div>
+
+            <div className="form-group">
               <label className="form-label">Observaciones iniciales</label>
               <textarea className="form-control" rows={3} value={form.observaciones_ini}
                 onChange={e => setForm(p=>({...p,observaciones_ini:e.target.value}))}
-                placeholder="Estado del pelaje, comportamiento, observaciones previas..." />
+                placeholder="Notas generales sobre pelaje y comportamiento..." />
             </div>
           </div>
           <div className="modal-footer">
@@ -64,6 +107,27 @@ function FichaCard({ ficha, onRefresh }) {
   const [cerrandoModal, setCerrandoModal] = useState(false);
   const [obsFinModal, setObsFinModal]   = useState({ observaciones_fin:'', recomendaciones:'' });
   const [loading, setLoading]           = useState(false);
+  const [fotos, setFotos] = useState(ficha.foto_servicio || []);
+  const [uploading, setUploading] = useState(false);
+  const [uploadTipo, setUploadTipo] = useState('antes');
+  const [uploadDesc, setUploadDesc] = useState('');
+  const [insumos, setInsumos] = useState([]);
+  const [productos, setProductos] = useState([]);
+  const [insumoForm, setInsumoForm] = useState({ producto_id:'', cantidad:'', tipo:'recibido', motivo:'' });
+  const [loadingInsumos, setLoadingInsumos] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    Promise.all([
+      api.get(`/grooming/ficha/${ficha.id}/insumos`).catch(() => ({ data: { data: [] } })),
+      api.get('/productos').catch(() => ({ data: { data: [] } })),
+    ]).then(([iResp, pResp]) => {
+      if (!mounted) return;
+      setInsumos(iResp.data?.data || []);
+      setProductos(pResp.data?.data || []);
+    });
+    return () => { mounted = false; };
+  }, [ficha.id]);
 
   const agregarItem = async () => {
     if (!nuevoItem.trim()) return;
@@ -74,6 +138,57 @@ function FichaCard({ ficha, onRefresh }) {
       setChecklist(p => [...p, ...data.data]);
       setNuevoItem('');
     } catch (e) { toast.error('Error al agregar ítem'); }
+  };
+
+  const handleFile = async (file) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fileData = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const resp = await api.post(`/grooming/ficha/${ficha.id}/fotos`, {
+        file_base64: fileData,
+        file_name: file.name,
+        mime_type: file.type,
+        tipo: uploadTipo,
+        descripcion: uploadDesc,
+      });
+      setFotos(p => [...p, resp.data.data]);
+      setUploadDesc('');
+    } catch (e) {
+      toast.error(e.message || 'Error al subir foto');
+    } finally { setUploading(false); }
+  };
+
+  const eliminarFoto = async (fotoId) => {
+    try {
+      await api.delete(`/grooming/fotos/${fotoId}`);
+      setFotos(p => p.filter(f => f.id !== fotoId));
+    } catch (e) { toast.error('No se pudo eliminar la foto'); }
+  };
+
+  const registrarInsumo = async () => {
+    try {
+      setLoadingInsumos(true);
+      const { data } = await api.post(`/grooming/ficha/${ficha.id}/insumos`, {
+        producto_id: insumoForm.producto_id,
+        cantidad: insumoForm.cantidad,
+        tipo: insumoForm.tipo,
+        motivo: insumoForm.motivo,
+      });
+      setInsumos(p => [data.data, ...p]);
+      setInsumoForm({ producto_id:'', cantidad:'', tipo:'recibido', motivo:'' });
+      toast.success('Insumo registrado ✅');
+    } catch (e) {
+      toast.error(e.response?.data?.error || 'No se pudo registrar el insumo');
+    } finally {
+      setLoadingInsumos(false);
+    }
   };
 
   const toggleItem = async (item) => {
@@ -122,6 +237,112 @@ function FichaCard({ ficha, onRefresh }) {
           📋 <em>{ficha.observaciones_ini}</em>
         </div>
       )}
+
+      {/* Fotos */}
+      <div style={{ marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', marginBottom:8 }}>
+          <strong style={{ fontSize:'0.85rem', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.5px' }}>Fotos</strong>
+          {!ficha.cerrada && (
+            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+              <select className="form-control" value={uploadTipo} onChange={e => setUploadTipo(e.target.value)} style={{ maxWidth:120 }}>
+                <option value="antes">Antes</option>
+                <option value="durante">Durante</option>
+                <option value="despues">Después</option>
+              </select>
+              <input className="form-control" placeholder="Descripción" value={uploadDesc} onChange={e=>setUploadDesc(e.target.value)} style={{ maxWidth:160 }} />
+              <input type="file" accept="image/*" onChange={e => handleFile(e.target.files[0])} />
+            </div>
+          )}
+        </div>
+
+        <div style={{ display:'flex', gap:10, flexWrap:'wrap' }}>
+          {fotos.length === 0 && <div style={{ color:'var(--text-dim)', fontSize:'0.85rem' }}>Sin fotos aún.</div>}
+          {fotos.map(p => (
+            <div key={p.id} style={{ width:120, borderRadius:8, overflow:'hidden', position:'relative', border:'1px solid var(--border)' }}>
+              <img src={p.url} alt={p.descripcion || ''} style={{ width:'100%', height:90, objectFit:'cover' }} />
+              <div style={{ padding:6, fontSize:'0.75rem', color:'var(--text-muted)' }}>{p.tipo}</div>
+              {!ficha.cerrada && (
+                <button className="btn btn-danger btn-sm" style={{ position:'absolute', top:6, right:6 }} onClick={() => eliminarFoto(p.id)}>✕</button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Insumos */}
+      <div style={{ marginBottom:16 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+          <strong style={{ fontSize:'0.85rem', color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.5px' }}>Insumos</strong>
+          <span style={{ fontSize:'0.78rem', color:'var(--text-muted)' }}>{insumos.length} movimiento(s)</span>
+        </div>
+
+        {!ficha.cerrada && (
+          <div style={{ display:'grid', gridTemplateColumns:'1.5fr 0.7fr 0.8fr 1fr auto', gap:8, alignItems:'end', marginBottom:12 }}>
+            <div className="form-group" style={{ marginBottom:0 }}>
+              <label className="form-label">Producto</label>
+              <select className="form-control" value={insumoForm.producto_id} onChange={e => setInsumoForm(p => ({ ...p, producto_id: e.target.value }))}>
+                <option value="">— Seleccionar producto —</option>
+                {productos.map(p => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre} (stock {p.stock_actual} {p.unidad_medida || 'u'})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group" style={{ marginBottom:0 }}>
+              <label className="form-label">Cantidad</label>
+              <input className="form-control" type="number" min="1" value={insumoForm.cantidad} onChange={e => setInsumoForm(p => ({ ...p, cantidad: e.target.value }))} />
+            </div>
+
+            <div className="form-group" style={{ marginBottom:0 }}>
+              <label className="form-label">Movimiento</label>
+              <select className="form-control" value={insumoForm.tipo} onChange={e => setInsumoForm(p => ({ ...p, tipo: e.target.value }))}>
+                <option value="recibido">Recibido</option>
+                <option value="usado">Usado</option>
+                <option value="devuelto">Devuelto</option>
+                <option value="desperdiciado">Desperdiciado</option>
+              </select>
+            </div>
+
+            <div className="form-group" style={{ marginBottom:0 }}>
+              <label className="form-label">Motivo / nota</label>
+              <input className="form-control" value={insumoForm.motivo} onChange={e => setInsumoForm(p => ({ ...p, motivo: e.target.value }))} placeholder="Opcional" />
+            </div>
+
+            <button className="btn btn-secondary" onClick={registrarInsumo} disabled={loadingInsumos || !insumoForm.producto_id || !insumoForm.cantidad}>
+              {loadingInsumos ? 'Guardando...' : 'Registrar'}
+            </button>
+          </div>
+        )}
+
+        {insumos.length === 0 ? (
+          <div style={{ color:'var(--text-dim)', fontSize:'0.85rem' }}>Sin movimientos de insumos aún.</div>
+        ) : (
+          <div style={{ display:'grid', gap:8 }}>
+            {insumos.map(m => (
+              <div key={m.id} style={{ padding:'10px 12px', border:'1px solid var(--border)', borderRadius:10, background:'var(--bg-input)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between', gap:10 }}>
+                  <div>
+                    <strong>{m.producto?.nombre}</strong>
+                    <div style={{ fontSize:'0.8rem', color:'var(--text-muted)' }}>
+                      {m.tipo === 'entrada' && 'Recibido'}
+                      {m.tipo === 'salida' && 'Usado'}
+                      {m.tipo === 'devolucion' && 'Devuelto'}
+                      {m.tipo === 'ajuste' && 'Desperdiciado'}
+                      {' '}· Cantidad: {m.cantidad}
+                    </div>
+                  </div>
+                  <div style={{ textAlign:'right', fontSize:'0.8rem', color:'var(--text-muted)' }}>
+                    Stock: {m.stock_anterior} → {m.stock_nuevo}
+                  </div>
+                </div>
+                {m.motivo && <div style={{ marginTop:6, fontSize:'0.8rem', color:'var(--text-muted)' }}>{m.motivo}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Checklist */}
       <div style={{ marginBottom:16 }}>
@@ -209,6 +430,10 @@ export default function GroomingPage() {
   const [loading, setLoading]   = useState(true);
   const [modal, setModal]       = useState(false);
   const [filtroCerrada, setFiltroCerrada] = useState('false');
+  const [agenda, setAgenda] = useState([]);
+  const [agendaLoading, setAgendaLoading] = useState(false);
+  const [viewMode, setViewMode] = useState('day'); // 'day' or 'week'
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0,10));
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -224,7 +449,43 @@ export default function GroomingPage() {
     finally { setLoading(false); }
   }, []);
 
+  const cargarAgenda = useCallback(async () => {
+    setAgendaLoading(true);
+    try {
+      const d = new Date(selectedDate + 'T00:00:00');
+      let desde, hasta;
+      if (viewMode === 'day') {
+        desde = new Date(d.setHours(0,0,0,0)).toISOString();
+        hasta = new Date(new Date(desde).setHours(23,59,59,999)).toISOString();
+      } else {
+        // week: start Monday
+        const day = d.getDay();
+        const diff = (day === 0 ? -6 : 1) - day; // move to Monday
+        const monday = new Date(d);
+        monday.setDate(d.getDate() + diff);
+        monday.setHours(0,0,0,0);
+        const sunday = new Date(monday);
+        sunday.setDate(monday.getDate() + 6);
+        sunday.setHours(23,59,59,999);
+        desde = monday.toISOString();
+        hasta = sunday.toISOString();
+      }
+
+      const { data } = await api.get('/grooming/agenda', { params: { desde, hasta } });
+      setAgenda(data.data || []);
+    } catch (e) {
+      toast.error('No se pudo cargar la agenda');
+      setAgenda([]);
+    } finally { setAgendaLoading(false); }
+  }, [selectedDate, viewMode]);
+
   useEffect(() => { cargar(); }, [cargar]);
+  useEffect(() => { cargarAgenda(); }, [cargarAgenda]);
+  useEffect(() => {
+    api.post('/grooming/storage/fotos/ensure').catch(() => {
+      // Si falla, la subida seguirá intentando y mostrará el error real.
+    });
+  }, []);
 
   return (
     <div>
@@ -237,11 +498,20 @@ export default function GroomingPage() {
       </div>
 
       <div className="search-bar">
-        <select className="form-control" value={filtroCerrada} onChange={e => setFiltroCerrada(e.target.value)} style={{ maxWidth:200 }}>
+        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+          <select className="form-control" value={filtroCerrada} onChange={e => setFiltroCerrada(e.target.value)} style={{ maxWidth:200 }}>
           <option value="false">En progreso</option>
           <option value="true">Completadas</option>
           <option value="all">Todas</option>
-        </select>
+          </select>
+
+          <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+            <button className={`btn ${viewMode==='day'?'btn-primary':'btn-secondary'}`} onClick={() => setViewMode('day')}>Día</button>
+            <button className={`btn ${viewMode==='week'?'btn-primary':'btn-secondary'}`} onClick={() => setViewMode('week')}>Semana</button>
+            <input type="date" className="form-control" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} style={{ maxWidth:160 }} />
+            <button className="btn btn-secondary" onClick={cargarAgenda} disabled={agendaLoading}>{agendaLoading ? 'Cargando...' : 'Actualizar agenda'}</button>
+          </div>
+        </div>
       </div>
 
       {loading ? (
@@ -255,9 +525,37 @@ export default function GroomingPage() {
           </button>
         </div>
       ) : (
-        fichas
-          .filter(f => filtroCerrada === 'all' ? true : filtroCerrada === 'true' ? f.cerrada : !f.cerrada)
-          .map(f => <FichaCard key={f.id} ficha={f} onRefresh={cargar} />)
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 420px', gap:20 }}>
+          <div>
+            <h3 style={{ marginBottom:10 }}>Agenda ({viewMode === 'day' ? 'Día' : 'Semana'})</h3>
+            {agendaLoading ? <div>Cargando agenda...</div> : (
+              agenda.length === 0 ? <div className="empty-state"><div className="empty-state-icon">📭</div>No hay citas en este rango.</div> : (
+                agenda.map(s => (
+                  <div key={s.id} className="card" style={{ marginBottom:12 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between' }}>
+                      <div>
+                        <div style={{ fontWeight:600 }}>{s.mascotas?.nombre}</div>
+                        <div style={{ fontSize:'0.85rem', color:'var(--text-muted)' }}>{s.servicios?.nombre}</div>
+                      </div>
+                      <div style={{ textAlign:'right' }}>
+                        <div style={{ fontWeight:600 }}>{new Date(s.fecha_inicio).toLocaleDateString('es-PE')}</div>
+                        <div style={{ fontSize:'0.85rem', color:'var(--text-muted)' }}>{new Date(s.fecha_inicio).toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'})}</div>
+                      </div>
+                    </div>
+                    <div style={{ marginTop:8, fontSize:'0.85rem', color:'var(--text-muted)' }}>Cliente: {s.clientes?.usuarios?.nombre} {s.clientes?.usuarios?.apellido}</div>
+                  </div>
+                ))
+              )
+            )}
+          </div>
+
+          <div>
+            <h3 style={{ marginBottom:10 }}>Fichas</h3>
+            {fichas
+              .filter(f => filtroCerrada === 'all' ? true : filtroCerrada === 'true' ? f.cerrada : !f.cerrada)
+              .map(f => <FichaCard key={f.id} ficha={f} onRefresh={cargar} />)}
+          </div>
+        </div>
       )}
 
       {modal && (

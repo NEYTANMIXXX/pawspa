@@ -5,6 +5,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import MascotaHistorial from '../components/pets/MascotaHistorial';
 
 const ESPECIES = ['perro','gato','conejo','ave','otro'];
 const TAMANOS  = ['mini','pequeno','mediano','grande','gigante'];
@@ -131,6 +132,7 @@ export default function MascotasPage() {
   const [search, setSearch]       = useState('');
   const [modal, setModal]         = useState(null); // null | 'nuevo' | mascota
   const [confirmDel, setConfirmDel] = useState(null);
+  const [historialMascota, setHistorialMascota] = useState(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -210,6 +212,7 @@ export default function MascotasPage() {
                   <td>
                     <div style={{display:'flex',gap:8}}>
                       <button className="btn btn-secondary btn-sm" onClick={()=>setModal(m)}>✏️</button>
+                      <button className="btn btn-info btn-sm" onClick={()=>setHistorialMascota(m)}>📜</button>
                       {esStaff && <button className="btn btn-danger btn-sm" onClick={()=>setConfirmDel(m)}>🗑️</button>}
                     </div>
                   </td>
@@ -228,6 +231,11 @@ export default function MascotasPage() {
           onClose={() => setModal(null)}
           onSaved={() => { setModal(null); cargar(); }}
         />
+      )}
+
+      {/* Modal historial */}
+      {historialMascota && (
+        <MascotaHistorial mascotaId={historialMascota.id} onClose={() => setHistorialMascota(null)} />
       )}
 
       {/* Confirm delete */}

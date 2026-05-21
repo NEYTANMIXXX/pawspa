@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import Turnstile from 'react-turnstile';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -12,16 +13,36 @@ export default function LoginPage() {
   const [form, setForm]   = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError]    = useState('');
+  const [captchaToken, setCaptchaToken] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (!captchaToken) {
+      setError(
+        'Debes completar el CAPTCHA.'
+      );
+      return;
+    }
     setLoading(true);
     try {
-      const u = await login(form.email, form.password);
-      toast.success(`¡Bienvenido, ${u.nombre}! 🐾`);
+      const resultado = await login(form.email, form.password, captchaToken);
+      if (resultado?.pendiente2fa) {
+        toast('Ingresa tu código 2FA para continuar.');
+        const params = new URLSearchParams();
+        params.set('token', resultado.tokenTemporal);
+        params.set('email', form.email);
+        navigate(`/two-factor?${params.toString()}`);
+        return;
+      }
+      toast.success(`¡Bienvenido, ${resultado.usuario.nombre}! 🐾`);
       navigate('/dashboard');
     } catch (err) {
+      if (err.response?.data?.requiereVerificacion) {
+        const params = new URLSearchParams();
+        params.set('email', form.email);
+        navigate(`/verify-email?${params.toString()}`);
+      }
       setError(err.response?.data?.error || 'Error al iniciar sesión.');
     } finally {
       setLoading(false);
@@ -55,9 +76,29 @@ export default function LoginPage() {
             <input className="form-control" type="password" placeholder="••••••••" value={form.password}
               onChange={e => setForm(p => ({ ...p, password: e.target.value }))} required />
           </div>
+          <div style={{ marginTop: 20, marginBottom: 10 }}>
+            <Turnstile
+              sitekey={process.env.REACT_APP_TURNSTILE_SITE_KEY}
+              onVerify={(token) => {
+                setCaptchaToken(token);
+              }}
+            />
+          </div>
           <button className="btn btn-primary w-full" type="submit" disabled={loading} style={{ marginTop: 8 }}>
             {loading ? 'Ingresando...' : '🔑 Iniciar Sesión'}
           </button>
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <Link
+              to="/forgot-password"
+              style={{
+                color: 'var(--brand-light)',
+                fontSize: '0.9rem',
+                textDecoration: 'none'
+              }}
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
         </form>
 
         <div className="auth-divider">¿No tienes cuenta?</div>

@@ -9,8 +9,10 @@ const NAV_ITEMS = [
   { to: '/dashboard', icon: '📊', label: 'Dashboard',   roles: ['admin','recepcion','groomer','cliente'] },
   { to: '/mascotas',  icon: '🐾', label: 'Mascotas',    roles: ['admin','recepcion','groomer','cliente'] },
   { to: '/reservas',  icon: '📅', label: 'Reservas',    roles: ['admin','recepcion','groomer','cliente'] },
+  { to: '/pagos',     icon: '💳', label: 'Pagos',       roles: ['admin','recepcion'] },
   { to: '/grooming',  icon: '✂️', label: 'Grooming',    roles: ['admin','recepcion','groomer'] },
   { to: '/usuarios',  icon: '👥', label: 'Usuarios',    roles: ['admin'] },
+  { to: '/two-factor-setup', icon: '🔐', label: '2FA Admin', roles: ['admin'] },
 ];
 
 const rolLabel = { admin: 'Administrador', recepcion: 'Recepcionista', groomer: 'Groomer', cliente: 'Cliente' };
@@ -27,8 +29,10 @@ export default function Layout() {
     '/dashboard': 'Dashboard',
     '/mascotas':  'Gestión de Mascotas',
     '/reservas':  'Reservas & Citas',
+    '/pagos':     'Registro de Pagos',
     '/grooming':  'Panel Grooming',
     '/usuarios':  'Gestión de Usuarios',
+    '/two-factor-setup': '2FA de Administrador',
   };
 
   return (
@@ -70,7 +74,21 @@ export default function Layout() {
       <header className="navbar">
         <h1 className="navbar-title">{titleMap[location.pathname] || 'PawSpa'}</h1>
         <div className="navbar-right">
-          <button className="btn btn-secondary btn-sm" onClick={() => { logout(); navigate('/login'); }}>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => navigate('/change-password')}
+            style={{ marginRight: 10 }}
+          >
+            🔑 Cambiar contraseña
+          </button>
+
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={() => {
+              logout();
+              navigate('/login');
+            }}
+          >
             🚪 Cerrar sesión
           </button>
         </div>

@@ -21,20 +21,48 @@ export const AuthProvider = ({ children }) => {
     setCargando(false);
   }, []);
 
-  const login = useCallback(async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password });
+  const login = useCallback(async (email, password, captchaToken) => {
+    const { data } = await api.post('/auth/login', { email, password, captchaToken });
+    if (data.pendiente2fa) {
+      return data;
+    }
     localStorage.setItem('pawspa_token',   data.token);
     localStorage.setItem('pawspa_usuario', JSON.stringify(data.usuario));
     setUsuario(data.usuario);
-    return data.usuario;
+    return data;
   }, []);
 
   const registrar = useCallback(async (formData) => {
     const { data } = await api.post('/auth/registro', formData);
+    return data;
+  }, []);
+
+  const reenviarVerificacion = useCallback(async (email) => {
+    const { data } = await api.post('/auth/email/send-verification', { email });
+    return data;
+  }, []);
+
+  const verificarEmail = useCallback(async (token) => {
+    const { data } = await api.post('/auth/email/verify', { token });
+    return data;
+  }, []);
+
+  const completarLogin2fa = useCallback(async (token, codigo) => {
+    const { data } = await api.post('/auth/2fa/verify-login', { token, codigo });
     localStorage.setItem('pawspa_token',   data.token);
     localStorage.setItem('pawspa_usuario', JSON.stringify(data.usuario));
     setUsuario(data.usuario);
-    return data.usuario;
+    return data;
+  }, []);
+
+  const setup2fa = useCallback(async () => {
+    const { data } = await api.post('/auth/2fa/setup');
+    return data;
+  }, []);
+
+  const verify2fa = useCallback(async (token) => {
+    const { data } = await api.post('/auth/2fa/verify', { token });
+    return data;
   }, []);
 
   const logout = useCallback(async () => {
@@ -52,7 +80,23 @@ export const AuthProvider = ({ children }) => {
   const esStaff     = ['admin', 'recepcion', 'groomer'].includes(usuario?.rol);
 
   return (
-    <AuthContext.Provider value={{ usuario, cargando, login, registrar, logout, esAdmin, esRecepcion, esGroomer, esCliente, esStaff }}>
+    <AuthContext.Provider value={{
+      usuario,
+      cargando,
+      login,
+      registrar,
+      logout,
+      reenviarVerificacion,
+      verificarEmail,
+      completarLogin2fa,
+      setup2fa,
+      verify2fa,
+      esAdmin,
+      esRecepcion,
+      esGroomer,
+      esCliente,
+      esStaff,
+    }}>
       {children}
     </AuthContext.Provider>
   );

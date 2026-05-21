@@ -102,6 +102,26 @@ const actualizar = async (req, res, next) => {
     const { id } = req.params;
     const { cliente_id, ...campos } = req.body; // No permitir cambiar dueño por este endpoint
 
+    // Verificar ownership: si es cliente, solo puede actualizar sus propias mascotas
+    if (req.usuario.rol === 'cliente') {
+      const { data: cliente } = await supabaseAdmin
+        .from('clientes')
+        .select('id')
+        .eq('usuario_id', req.usuario.id)
+        .single();
+
+      if (!cliente) return res.status(400).json({ error: 'Perfil de cliente no encontrado.' });
+
+      const { data: mascotaActual } = await supabaseAdmin
+        .from('mascotas')
+        .select('id, cliente_id')
+        .eq('id', id)
+        .single();
+
+      if (!mascotaActual) return res.status(404).json({ error: 'Mascota no encontrada.' });
+      if (mascotaActual.cliente_id !== cliente.id) return res.status(403).json({ error: 'No tienes permisos sobre esta mascota.' });
+    }
+
     const { data, error } = await supabaseAdmin
       .from('mascotas')
       .update(campos)
@@ -121,6 +141,37 @@ const actualizar = async (req, res, next) => {
 const eliminar = async (req, res, next) => {
   try {
     const { id } = req.params;
+    // Si es cliente, verificar que la mascota pertenezca a él
+    if (req.usuario.rol === 'cliente') {
+      const { data: cliente } = await supabaseAdmin
+        .from('clientes')
+        .select('id')
+        .eq('usuario_id', req.usuario.id)
+        .single();
+
+      if (!cliente) return res.status(400).json({ error: 'Perfil de cliente no encontrado.' });
+
+      const { data: mascotaActual } = await supabaseAdmin
+        .from('mascotas')
+        .select('id, cliente_id, nombre')
+        .eq('id', id)
+        .single();
+
+      if (!mascotaActual) return res.status(404).json({ error: 'Mascota no encontrada.' });
+      if (mascotaActual.cliente_id !== cliente.id) return res.status(403).json({ error: 'No tienes permisos sobre esta mascota.' });
+
+      const { data, error } = await supabaseAdmin
+        .from('mascotas')
+        .update({ activo: false })
+        .eq('id', id)
+        .select('id, nombre')
+        .single();
+
+      if (error || !data) return res.status(404).json({ error: 'Mascota no encontrada.' });
+      return res.json({ mensaje: `Mascota "${data.nombre}" desactivada.` });
+    }
+
+    // Permitir a admins/desarrolladores desactivar cualquier mascota
     const { data, error } = await supabaseAdmin
       .from('mascotas')
       .update({ activo: false })
@@ -135,4 +186,55 @@ const eliminar = async (req, res, next) => {
   }
 };
 
-module.exports = { listar, obtener, crear, actualizar, eliminar };
+// ── Historial de servicios por mascota ───────────────────────
+const historial = async (req, res, next) => {
+  try {
+    const { id } = req.params; // mascota id
+    const { rol, id: usuarioId } = req.usuario;
+
+    // Si es cliente, verificar ownership
+    if (rol === 'cliente') {
+      const { data: cliente } = await supabaseAdmin
+        .from('clientes')
+        .select('id')
+        .eq('usuario_id', usuarioId)
+        .single();
+
+      if (!cliente) return res.status(400).json({ error: 'Perfil de cliente no encontrado.' });
+
+      const { data: mascota } = await supabaseAdmin
+        .from('mascotas')
+        .select('id, cliente_id')
+        .eq('id', id)
+        .single();
+
+      if (!mascota) return res.status(404).json({ error: 'Mascota no encontrada.' });
+      if (mascota.cliente_id !== cliente.id) return res.status(403).json({ error: 'No tienes permisos sobre esta mascota.' });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('slot_reserva')
+      .select(`
+        id,
+        fecha_inicio,
+        fecha_fin,
+        estado,
+        servicio_id,
+        precio_acordado,
+        observaciones,
+        servicios (id, nombre, duracion_min),
+        groomers (id, usuarios (nombre, apellido)),
+        clientes (id, usuarios (nombre, apellido))
+      `)
+      .eq('mascota_id', id)
+      .eq('estado', 'completada')
+      .order('fecha_inicio', { ascending: false });
+
+    if (error) throw error;
+    return res.json({ data, total: data.length });
+  } catch (err) {
+    next(err);
+  }
+};
+
+module.exports = { listar, obtener, crear, actualizar, eliminar, historial };

@@ -10,7 +10,7 @@ const rolColor = { admin:'role-admin', recepcion:'role-recepcion', groomer:'role
 
 function ModalUsuario({ usuario, onClose, onSaved }) {
   const [form, setForm] = useState({
-    nombre: '', apellido: '', email: '', password: '', telefono: '', rol: 'cliente',
+    nombre: '', apellido: '', email: '', password: undefined, telefono: '', rol: 'cliente',
     ...(usuario ? { ...usuario, password: '' } : {}),
   });
   const [loading, setLoading] = useState(false);
@@ -26,7 +26,7 @@ function ModalUsuario({ usuario, onClose, onSaved }) {
         toast.success('Usuario actualizado ✅');
       } else {
         await api.post('/usuarios', form);
-        toast.success('Usuario creado ✅');
+        toast.success('Usuario creado ✅ Se enviaron las instrucciones al correo del usuario.');
       }
       onSaved();
     } catch (err) {
@@ -57,12 +57,10 @@ function ModalUsuario({ usuario, onClose, onSaved }) {
               <label className="form-label">Email</label>
               <input className="form-control" type="email" value={form.email} onChange={f('email')} required disabled={!!usuario} />
             </div>
-            {!usuario && (
-              <div className="form-group">
-                <label className="form-label">Contraseña (mín. 8 caracteres)</label>
-                <input className="form-control" type="password" value={form.password} onChange={f('password')} required minLength={8} />
-              </div>
-            )}
+             
+
+
+             
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
               <div className="form-group">
                 <label className="form-label">Teléfono</label>

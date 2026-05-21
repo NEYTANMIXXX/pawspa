@@ -20,7 +20,7 @@ CREATE TYPE tipo_auditoria AS ENUM ('login', 'logout', 'crear', 'actualizar', 'e
 CREATE TYPE estado_notificacion AS ENUM ('no_leida', 'leida', 'archivada');
 CREATE TYPE tipo_notificacion AS ENUM ('cita', 'pago', 'sistema', 'grooming', 'stock');
 CREATE TYPE tipo_pago AS ENUM ('efectivo', 'tarjeta_credito', 'tarjeta_debito', 'transferencia', 'qr');
-CREATE TYPE estado_pago AS ENUM ('pendiente', 'pagado', 'parcial', 'anulado', 'reembolsado');
+CREATE TYPE estado_pago AS ENUM ('pendiente', 'no_verificado', 'verificado', 'parcial', 'anulado', 'reembolsado');
 CREATE TYPE especie_mascota AS ENUM ('perro', 'gato', 'conejo', 'ave', 'otro');
 CREATE TYPE tamano_mascota AS ENUM ('mini', 'pequeno', 'mediano', 'grande', 'gigante');
 CREATE TYPE sexo_mascota AS ENUM ('macho', 'hembra');
@@ -38,6 +38,8 @@ CREATE TABLE usuarios (
     telefono        VARCHAR(20),
     rol             rol_usuario NOT NULL DEFAULT 'cliente',
     activo          BOOLEAN NOT NULL DEFAULT TRUE,
+    email_verificado BOOLEAN NOT NULL DEFAULT FALSE,
+    email_verificado_en TIMESTAMPTZ,
     avatar_url      TEXT,
     intentos_login  INT NOT NULL DEFAULT 0,
     bloqueado_hasta TIMESTAMPTZ,
@@ -550,3 +552,39 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_numero_factura
 BEFORE INSERT ON pago_factura
 FOR EACH ROW EXECUTE FUNCTION generar_numero_factura();
+
+-- ============================================================
+-- EMAIL VERIFICATION TOKENS (Expiración: 15 minutos)
+-- ============================================================
+
+CREATE TABLE email_verification_tokens (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    usuario_id      UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    token           VARCHAR(255) NOT NULL UNIQUE,
+    email           VARCHAR(255) NOT NULL,
+    usado           BOOLEAN NOT NULL DEFAULT FALSE,
+    usado_en        TIMESTAMPTZ,
+    expira_en       TIMESTAMPTZ NOT NULL DEFAULT (NOW() + INTERVAL '15 minutes'),
+    creado_en       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_email_token_usuario ON email_verification_tokens(usuario_id);
+CREATE INDEX idx_email_token_expira  ON email_verification_tokens(expira_en);
+
+-- ============================================================
+-- 2FA / TOTP SECRETS (Solo para Admin)
+-- ============================================================
+
+CREATE TABLE user_2fa_secrets (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    usuario_id      UUID NOT NULL UNIQUE REFERENCES usuarios(id) ON DELETE CASCADE,
+    secret          VARCHAR(255) NOT NULL,
+    qr_code         TEXT,
+    activo          BOOLEAN NOT NULL DEFAULT FALSE,
+    backup_codes    JSONB,  -- Array de códigos de respaldo
+    creado_en       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    actualizado_en  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_2fa_usuario ON user_2fa_secrets(usuario_id);
+CREATE INDEX idx_2fa_activo  ON user_2fa_secrets(activo);

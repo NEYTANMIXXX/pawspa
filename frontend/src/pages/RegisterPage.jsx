@@ -4,6 +4,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 import toast from 'react-hot-toast';
 
 export default function RegisterPage() {
@@ -13,15 +14,37 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError]    = useState('');
 
+  // Validar complejidad de contraseña
+  const validarPassword = (password) => {
+    const requisitos = {
+      minLength: password.length >= 8,
+      mayuscula: /[A-Z]/.test(password),
+      minuscula: /[a-z]/.test(password),
+      numero: /\d/.test(password),
+      especial: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
+    };
+    
+    return Object.values(requisitos).every(v => v === true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (form.password.length < 8) return setError('La contraseña debe tener al menos 8 caracteres.');
+    
+    // Validar complejidad
+    if (!validarPassword(form.password)) {
+      return setError('La contraseña debe cumplir con todos los requisitos de complejidad.');
+    }
+    
     setLoading(true);
     try {
-      await registrar(form);
-      toast.success('¡Cuenta creada exitosamente! 🐾');
-      navigate('/dashboard');
+      const resultado = await registrar(form);
+      toast.success('Cuenta creada. Revisa tu correo para activarla.');
+      const token = resultado?.verificationToken;
+      const params = new URLSearchParams();
+      if (token) params.set('token', token);
+      params.set('email', form.email);
+      navigate(`/verify-email?${params.toString()}`);
     } catch (err) {
       setError(err.response?.data?.error || 'Error al registrar.');
     } finally {
@@ -59,8 +82,21 @@ export default function RegisterPage() {
             <input className="form-control" placeholder="999-000-000" value={form.telefono} onChange={e=>setForm(p=>({...p,telefono:e.target.value}))} />
           </div>
           <div className="form-group">
-            <label className="form-label">Contraseña (mín. 8 caracteres)</label>
+            <label className="form-label">Contraseña</label>
             <input className="form-control" type="password" placeholder="••••••••" value={form.password} onChange={e=>setForm(p=>({...p,password:e.target.value}))} required />
+            
+            {/* Medidor de fuerza */}
+            <PasswordStrengthMeter password={form.password} />
+            
+            {/* Requisitos */}
+            <div style={{ fontSize: '0.8rem', color: '#6b7280', marginTop: '8px', lineHeight: '1.5' }}>
+              <strong>Requisitos:</strong>
+              <div>✓ Mínimo 8 caracteres</div>
+              <div>✓ Mayúscula (A-Z)</div>
+              <div>✓ Minúscula (a-z)</div>
+              <div>✓ Número (0-9)</div>
+              <div>✓ Carácter especial (!@#$%...)</div>
+            </div>
           </div>
           <button className="btn btn-primary w-full" type="submit" disabled={loading}>{loading ? 'Creando...' : '✅ Crear cuenta'}</button>
         </form>
