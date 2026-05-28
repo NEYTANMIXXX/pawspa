@@ -128,7 +128,7 @@ const buscarGroomersDisponibles = async ({
         .from('slot_reserva')
         .select('id')
         .eq('groomer_id', candidateId)
-        .not('estado', 'in', '("cancelada","no_show")')
+        .not('estado', 'in', '("cancelada","completada","no_show")')
         .lt('fecha_inicio', fechaFinDate.toISOString())
         .gt('fecha_fin', fechaInicioDate.toISOString()),
     ]);

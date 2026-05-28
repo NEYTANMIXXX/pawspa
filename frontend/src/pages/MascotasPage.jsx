@@ -10,6 +10,7 @@ import MascotaHistorial from '../components/pets/MascotaHistorial';
 const ESPECIES = ['perro','gato','conejo','ave','otro'];
 const TAMANOS  = ['mini','pequeno','mediano','grande','gigante'];
 const SEXOS    = ['macho','hembra'];
+const TEMPERAMENTOS = ['tranquilo', 'nervioso', 'agresivo', 'inquieto'];
 
 const especieEmoji = { perro:'🐶', gato:'🐱', conejo:'🐰', ave:'🐦', otro:'🐾' };
 
@@ -18,23 +19,37 @@ function ModalMascota({ mascota, clientes, onClose, onSaved }) {
   const [form, setForm] = useState({
     nombre: '', especie: 'perro', raza: '', sexo: 'macho',
     tamano: 'mediano', peso_kg: '', color: '', alergias: '',
-    condiciones_med: '', notas: '', cliente_id: '',
+    condiciones_med: '', notas: '', cliente_id: '', temperamento: '', carnet_vacunas_url: '',
     ...(mascota || {}),
     peso_kg: mascota?.peso_kg || '',
   });
+  const [carnetVacunasFile, setCarnetVacunasFile] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }));
+
+  const leerArchivoComoDataUrl = (archivo) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo.'));
+    reader.readAsDataURL(archivo);
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
+      const payload = { ...form };
+
+      if (carnetVacunasFile) {
+        payload.carnet_vacunas_url = await leerArchivoComoDataUrl(carnetVacunasFile);
+      }
+
       if (mascota) {
-        await api.put(`/mascotas/${mascota.id}`, form);
+        await api.put(`/mascotas/${mascota.id}`, payload);
         toast.success('Mascota actualizada ✅');
       } else {
-        await api.post('/mascotas', form);
+        await api.post('/mascotas', payload);
         toast.success('Mascota registrada 🐾');
       }
       onSaved();
@@ -87,6 +102,13 @@ function ModalMascota({ mascota, clientes, onClose, onSaved }) {
                 </select>
               </div>
               <div className="form-group">
+                <label className="form-label">Temperamento</label>
+                <select className="form-control" value={form.temperamento || ''} onChange={f('temperamento')}>
+                  <option value="">— Seleccionar —</option>
+                  {TEMPERAMENTOS.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="form-group">
                 <label className="form-label">Tamaño</label>
                 <select className="form-control" value={form.tamano} onChange={f('tamano')}>
                   {TAMANOS.map(t=><option key={t} value={t}>{t}</option>)}
@@ -108,6 +130,23 @@ function ModalMascota({ mascota, clientes, onClose, onSaved }) {
             <div className="form-group">
               <label className="form-label">Condiciones médicas</label>
               <input className="form-control" value={form.condiciones_med||''} onChange={f('condiciones_med')} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Carnet de vacunas (opcional)</label>
+              <input
+                className="form-control"
+                type="file"
+                accept="image/*,.pdf"
+                onChange={e => setCarnetVacunasFile(e.target.files?.[0] || null)}
+              />
+              <div style={{ marginTop: 6, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                Puedes subir PDF o imagen. Si no eliges archivo, se guarda en blanco.
+              </div>
+              {form.carnet_vacunas_url && !carnetVacunasFile && (
+                <div style={{ marginTop: 6, fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  Ya existe un carnet cargado.
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">Notas</label>

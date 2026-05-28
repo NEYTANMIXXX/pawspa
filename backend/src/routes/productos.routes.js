@@ -17,7 +17,7 @@ r.get('/', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-r.post('/', autenticar, autorizar('admin'), async (req, res, next) => {
+r.post('/', autenticar, autorizar('admin','recepcion'), async (req, res, next) => {
   try {
     const { data, error } = await supabaseAdmin.from('producto').insert(req.body).select().single();
     if (error) throw error;

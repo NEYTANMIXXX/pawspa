@@ -21,13 +21,14 @@ const tipoMetodoBadge = (tipo) => {
   const m = {
     efectivo: 'badge-blue',
     qr: 'badge-purple',
-    transferencia: 'badge-orange'
+      transferencia: 'badge-orange',
+      otros: 'badge-gray'
   };
   return `badge ${m[tipo] || 'badge-gray'}`;
 };
 
 const iconoMetodo = (tipo) => {
-  const m = { efectivo: '💵', qr: '📱', transferencia: '🏦' };
+    const m = { efectivo: '💵', qr: '📱', transferencia: '🏦', otros: '💳' };
   return m[tipo] || '💳';
 };
 
@@ -117,6 +118,7 @@ export default function PagosPage() {
           <option value="efectivo">💵 Efectivo</option>
           <option value="qr">📱 QR</option>
           <option value="transferencia">🏦 Transferencia</option>
+          <option value="otros">💳 Otros</option>
         </select>
 
         <button className="btn btn-secondary" onClick={cargar}>
@@ -143,6 +145,7 @@ export default function PagosPage() {
                 <th>Mascota / Servicio</th>
                 <th>Método</th>
                 <th>Monto</th>
+                <th>Acciones</th>
                 <th>Estado</th>
                 <th>Fecha</th>
               </tr>
@@ -172,7 +175,25 @@ export default function PagosPage() {
                     </span>
                   </td>
                   <td style={{ fontWeight: 600 }}>
-                    S/ {parseFloat(p.total).toFixed(2)}
+                    Bs. {parseFloat(p.total).toFixed(2)}
+                  </td>
+                  <td>
+                    <button
+                      className="btn btn-tertiary"
+                      onClick={async () => {
+                        try {
+                          toast.loading('Enviando comprobante...');
+                          await api.post(`/reservas/pagos/${p.id}/enviar-comprobante`);
+                          toast.dismiss();
+                          toast.success('Comprobante enviado ✅');
+                        } catch (e) {
+                          toast.dismiss();
+                          toast.error(e.response?.data?.error || 'No se pudo enviar el comprobante.');
+                        }
+                      }}
+                    >
+                      ✉️ Enviar
+                    </button>
                   </td>
                   <td>
                     <select
@@ -209,7 +230,7 @@ export default function PagosPage() {
               Total recaudado
             </div>
             <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>
-              S/ {pagos
+              Bs. {pagos
                 .filter(p => p.estado === 'verificado')
                 .reduce((sum, p) => sum + parseFloat(p.total || 0), 0)
                 .toFixed(2)}
@@ -221,7 +242,7 @@ export default function PagosPage() {
               Total por QR
             </div>
             <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>
-              S/ {pagos
+              Bs. {pagos
                 .filter(p => p.tipo_pago === 'qr' && p.estado === 'verificado')
                 .reduce((sum, p) => sum + parseFloat(p.total || 0), 0)
                 .toFixed(2)}
@@ -233,7 +254,7 @@ export default function PagosPage() {
               Total en efectivo
             </div>
             <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>
-              S/ {pagos
+              Bs. {pagos
                 .filter(p => p.tipo_pago === 'efectivo' && p.estado === 'verificado')
                 .reduce((sum, p) => sum + parseFloat(p.total || 0), 0)
                 .toFixed(2)}

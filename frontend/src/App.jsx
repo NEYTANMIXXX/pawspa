@@ -12,10 +12,15 @@ import VerifyEmailPage from './pages/VerifyEmailPage';
 import TwoFactorPage   from './pages/TwoFactorPage';
 import TwoFactorSetupPage from './pages/TwoFactorSetupPage';
 import DashboardPage   from './pages/DashboardPage';
+import AdminReportsPage from './pages/AdminReportsPage';
+import CalendarioPage  from './pages/CalendarioPage';
 import MascotasPage    from './pages/MascotasPage';
+import TiendaPage      from './pages/TiendaPage';
+import CierreCajaPage  from './pages/CierreCajaPage';
 import ReservasPage    from './pages/ReservasPage';
 import PagosPage       from './pages/PagosPage';
 import UsuariosPage    from './pages/UsuariosPage';
+import DescuentosPage  from './pages/DescuentosPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import GroomingPage    from './pages/GroomingPage';
@@ -44,11 +49,16 @@ const AppRoutes = () => {
       <Route path="/" element={<RutaProtegida><Layout /></RutaProtegida>}>
         <Route index element={<Navigate to="/dashboard" />} />
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="reports" element={<RutaProtegida roles={['admin']}><AdminReportsPage /></RutaProtegida>} />
+        <Route path="calendario" element={<RutaProtegida roles={['admin','recepcion']}><CalendarioPage /></RutaProtegida>} />
         <Route path="mascotas"  element={<MascotasPage />} />
+        <Route path="tienda"    element={<TiendaPage />} />
         <Route path="reservas"  element={<ReservasPage />} />
         <Route path="pagos"     element={<RutaProtegida roles={['admin','recepcion']}><PagosPage /></RutaProtegida>} />
+        <Route path="descuentos" element={<RutaProtegida roles={['admin','recepcion']}><DescuentosPage /></RutaProtegida>} />
         <Route path="grooming"  element={<RutaProtegida roles={['admin','groomer','recepcion']}><GroomingPage /></RutaProtegida>} />
         <Route path="usuarios"  element={<RutaProtegida roles={['admin']}><UsuariosPage /></RutaProtegida>} />
+        <Route path="caja"      element={<RutaProtegida roles={['admin','recepcion']}><CierreCajaPage /></RutaProtegida>} />
         <Route path="two-factor-setup" element={<RutaProtegida roles={['admin']}><TwoFactorSetupPage /></RutaProtegida>} />
         <Route path="change-password" element={<ChangePasswordPage />}/>
       </Route>

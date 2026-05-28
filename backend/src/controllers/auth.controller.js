@@ -6,11 +6,12 @@ const jwt     = require('jsonwebtoken');
 const crypto  = require('crypto');
 const { supabase, supabaseAdmin } = require('../services/supabase');
 const { generarSecretTotp, verificarTokenTotp, generarCodigosRespaldo } = require('../utils/totpHelper');
-const { enviarCorreoVerificacion } = require('../services/email.service');
+const { enviarCorreoVerificacion, enviarCorreoRecuperacion } = require('../services/email.service');
 
 const BCRYPT_ROUNDS     = parseInt(process.env.BCRYPT_ROUNDS)  || 12;
 const MAX_INTENTOS      = parseInt(process.env.MAX_LOGIN_ATTEMPTS) || 5;
 const LOCKOUT_MINUTOS   = parseInt(process.env.LOCKOUT_MINUTES) || 15;
+const LOGIN_LOCKOUT_ENABLED = process.env.LOGIN_LOCKOUT_ENABLED !== 'false';
 
 const generarTokenVerificacionEmail = (usuario) => {
   return jwt.sign(
@@ -199,8 +200,8 @@ const login = async (req, res, next) => {
       });
     }
 
-    // Verificar si cuenta está bloqueada
-    if (usuario.bloqueado_hasta && new Date(usuario.bloqueado_hasta) > new Date()) {
+    // Bloqueo temporalmente desactivado
+    if (LOGIN_LOCKOUT_ENABLED && usuario.bloqueado_hasta && new Date(usuario.bloqueado_hasta) > new Date()) {
       return res.status(403).json({
         error: `Cuenta bloqueada. Intenta después de ${new Date(usuario.bloqueado_hasta).toLocaleTimeString()}.`
       });
@@ -210,6 +211,10 @@ const login = async (req, res, next) => {
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
     if (authError) {
+      if (!LOGIN_LOCKOUT_ENABLED) {
+        return res.status(401).json({ error: 'Credenciales inválidas.' });
+      }
+
       // Incrementar intentos fallidos
       const nuevoIntento = (usuario.intentos_login || 0) + 1;
       const bloqueado = nuevoIntento >= MAX_INTENTOS;
@@ -321,11 +326,113 @@ const forgotPassword = async (req, res, next) => {
 
     const resetLink = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
 
-    // TODO: Enviar email con resetLink
-    console.log(`🔗 Reset password link: ${resetLink}`);
+    const resultadoEnvio = await enviarCorreoRecuperacion({
+      to: usuario.email,
+      link: resetLink,
+      nombre: usuario.nombre,
+    });
+
+    if (!resultadoEnvio.enviado) {
+      return res.status(200).json({
+        mensaje: 'No se pudo enviar el correo de recuperación. Revisa la configuración SMTP.',
+        correo_enviado: false,
+        correo_modo: resultadoEnvio.modo,
+        correo_error: resultadoEnvio.razon,
+        resetLink: process.env.NODE_ENV === 'development' ? resetLink : undefined,
+      });
+    }
 
     return res.status(200).json({
       mensaje: 'Si el email existe, recibirás instrucciones para resetear tu contraseña.',
+      correo_enviado: true,
+      correo_modo: resultadoEnvio.modo,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: 'Token requerido.' });
+    }
+
+    if (!password) {
+      return res.status(400).json({ error: 'Nueva contraseña requerida.' });
+    }
+
+    let payload;
+    try {
+      payload = jwt.verify(token, process.env.JWT_SECRET);
+      if (payload.purpose !== 'password_reset') {
+        return res.status(401).json({ error: 'Token inválido.' });
+      }
+    } catch (err) {
+      return res.status(401).json({ error: 'Token expirado o inválido.' });
+    }
+
+    const { data: registro, error } = await supabaseAdmin
+      .from('password_reset_tokens')
+      .select('id, usuario_id, expira_en, usado')
+      .eq('token', token)
+      .single();
+
+    const usuarioId = registro?.usuario_id || payload.sub;
+
+    if (registro) {
+      if (new Date(registro.expira_en) < new Date()) {
+        return res.status(400).json({ error: 'Token expirado. Solicita uno nuevo.' });
+      }
+
+      if (registro.usado) {
+        return res.status(400).json({ error: 'Este token ya fue utilizado.' });
+      }
+    } else if (error) {
+      console.warn('password_reset_tokens no disponible o token no encontrado; usando solo JWT firmado.', error.message);
+    }
+
+    const { data: usuario, error: usuarioError } = await supabaseAdmin
+      .from('usuarios')
+      .select('id, auth_id, email')
+      .eq('id', usuarioId)
+      .single();
+
+    if (usuarioError || !usuario || !usuario.auth_id) {
+      return res.status(400).json({ error: 'No se pudo encontrar la cuenta asociada al token.' });
+    }
+
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
+      usuario.auth_id,
+      { password }
+    );
+
+    if (authError) {
+      return res.status(500).json({ error: 'No se pudo actualizar la contraseña.' });
+    }
+
+    if (registro) {
+      await supabaseAdmin
+        .from('password_reset_tokens')
+        .update({
+          usado: true,
+          usado_en: new Date().toISOString(),
+        })
+        .eq('id', registro.id);
+    }
+
+    await supabaseAdmin
+      .from('usuarios')
+      .update({
+        intentos_login: 0,
+        bloqueado_hasta: null,
+      })
+      .eq('id', usuario.id);
+
+    return res.json({
+      mensaje: 'Contraseña actualizada correctamente.',
     });
   } catch (err) {
     next(err);
@@ -450,6 +557,33 @@ const verifyEmail = async (req, res, next) => {
       return res.status(400).json({
         error: 'Este token ya fue utilizado.'
       });
+    }
+
+    // Obtener el usuario local para sincronizar también Supabase Auth
+    const { data: usuario, error: usuarioError } = await supabaseAdmin
+      .from('usuarios')
+      .select('id, auth_id, email')
+      .eq('id', registro.usuario_id)
+      .single();
+
+    if (usuarioError || !usuario) {
+      return res.status(400).json({
+        error: 'No se pudo encontrar la cuenta asociada al token.'
+      });
+    }
+
+    // Confirmar el email también en Supabase Auth; de lo contrario el login seguirá fallando
+    if (usuario.auth_id) {
+      const { error: authUpdateError } = await supabaseAdmin.auth.admin.updateUserById(
+        usuario.auth_id,
+        { email_confirm: true }
+      );
+
+      if (authUpdateError) {
+        return res.status(500).json({
+          error: 'No se pudo sincronizar la verificación con el sistema de autenticación.'
+        });
+      }
     }
 
     // Marcar como usado
@@ -748,6 +882,7 @@ module.exports = {
   logout, 
   perfil, 
   forgotPassword, 
+  resetPassword,
   sendVerificationEmail, 
   verifyEmail, 
   verify2faLogin, 

@@ -212,7 +212,7 @@ const historial = async (req, res, next) => {
       if (mascota.cliente_id !== cliente.id) return res.status(403).json({ error: 'No tienes permisos sobre esta mascota.' });
     }
 
-    const { data, error } = await supabaseAdmin
+    const { data: historialBase, error } = await supabaseAdmin
       .from('slot_reserva')
       .select(`
         id,
@@ -231,6 +231,63 @@ const historial = async (req, res, next) => {
       .order('fecha_inicio', { ascending: false });
 
     if (error) throw error;
+
+    const slots = historialBase || [];
+    const slotIds = slots.map((item) => item.id);
+
+    if (!slotIds.length) {
+      return res.json({ data: [], total: 0 });
+    }
+
+    const { data: fichas, error: fichasError } = await supabaseAdmin
+      .from('ficha_grooming')
+      .select(`
+        id,
+        slot_id,
+        hora_inicio,
+        hora_fin,
+        observaciones_ini,
+        observaciones_fin,
+        estado_pelaje,
+        incidentes,
+        recomendaciones,
+        cerrada
+      `)
+      .in('slot_id', slotIds);
+
+    if (fichasError) throw fichasError;
+
+    const fichasPorSlotId = new Map((fichas || []).map((ficha) => [ficha.slot_id, ficha]));
+    const fichaIds = (fichas || []).map((ficha) => ficha.id);
+
+    let fotosPorFichaId = new Map();
+    if (fichaIds.length) {
+      const { data: fotos, error: fotosError } = await supabaseAdmin
+        .from('foto_servicio')
+        .select('id, ficha_id, url, tipo, descripcion, creado_en')
+        .in('ficha_id', fichaIds)
+        .order('creado_en', { ascending: true });
+
+      if (fotosError) throw fotosError;
+
+      fotosPorFichaId = (fotos || []).reduce((map, foto) => {
+        if (!map.has(foto.ficha_id)) map.set(foto.ficha_id, []);
+        map.get(foto.ficha_id).push(foto);
+        return map;
+      }, new Map());
+    }
+
+    const data = slots.map((slot) => {
+      const ficha = fichasPorSlotId.get(slot.id) || null;
+      const fotos = ficha ? (fotosPorFichaId.get(ficha.id) || []) : [];
+
+      return {
+        ...slot,
+        ficha_grooming: ficha,
+        fotos_servicio: fotos,
+      };
+    });
+
     return res.json({ data, total: data.length });
   } catch (err) {
     next(err);

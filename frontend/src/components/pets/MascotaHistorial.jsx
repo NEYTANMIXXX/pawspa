@@ -50,6 +50,27 @@ export default function MascotaHistorial({ mascotaId, onClose }) {
                     </div>
                   </div>
                   {h.observaciones && <div style={{marginTop:8,color:'var(--text-muted)'}}>{h.observaciones}</div>}
+
+                  {h.fotos_servicio?.length > 0 && (
+                    <div style={{ marginTop: 12 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>
+                        Fotos del servicio
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        {h.fotos_servicio.map((foto) => (
+                          <div key={foto.id} style={{ width: 118, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--bg-input)' }}>
+                            <img src={foto.url} alt={foto.descripcion || foto.tipo || 'Foto de servicio'} style={{ width: '100%', height: 88, objectFit: 'cover', display: 'block' }} />
+                            <div style={{ padding: '6px 7px' }}>
+                              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>{foto.tipo || 'servicio'}</div>
+                              {foto.descripcion && (
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{foto.descripcion}</div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

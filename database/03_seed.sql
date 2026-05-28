@@ -184,6 +184,24 @@ INSERT INTO pago_factura (cliente_id, slot_id, subtotal, total, tipo_pago, estad
     40.00, 40.00, 'efectivo', 'verificado', NOW() - INTERVAL '3 days' + INTERVAL '10 hours');
 
 -- ============================================================
+-- PROMOCIONES DEMO
+-- ============================================================
+
+INSERT INTO promocion (id, nombre, codigo, tipo, valor, aplica_a, aplica_item_id, fecha_inicio, fecha_fin, activo, uso_max, uso_por_cliente) VALUES
+    ('pr1000000-0000-0000-0000-000000000001',
+     'Promo Temporada Verano',
+     'VERANO10',
+     'porcentaje',
+     10,
+     'all',
+     NULL,
+     NOW() - INTERVAL '1 day',
+     NOW() + INTERVAL '30 day',
+     TRUE,
+     100,
+     1);
+
+-- ============================================================
 -- NOTIFICACIONES DEMO
 -- ============================================================
 

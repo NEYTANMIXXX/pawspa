@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-
-import { supabase } from '../services/supabase';
+import api from '../utils/api';
 
 export default function ResetPasswordPage() {
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get('token') || '';
 
   const [password, setPassword] = useState('');
   const [confirmar, setConfirmar] = useState('');
@@ -35,20 +36,25 @@ export default function ResetPasswordPage() {
       return;
     }
 
+    if (!token) {
+      toast.error(
+        'El enlace de recuperación no contiene un token válido.'
+      );
+
+      return;
+    }
+
     setLoading(true);
 
     try {
 
-      const { error } = await supabase.auth.updateUser({
+      const { data } = await api.post('/auth/reset-password', {
+        token,
         password
       });
 
-      if (error) {
-        throw error;
-      }
-
       toast.success(
-        'Contraseña actualizada correctamente.'
+        data.mensaje || 'Contraseña actualizada correctamente.'
       );
 
       setTimeout(() => {
@@ -88,6 +94,10 @@ export default function ResetPasswordPage() {
 
           <div className="auth-logo-sub">
             Ingresa tu nueva contraseña
+          </div>
+
+          <div style={{ marginTop: 12, fontSize: '0.85rem', color: 'var(--text-muted)', textAlign: 'center' }}>
+            Usa el enlace que recibiste por correo para completar el cambio.
           </div>
 
         </div>

@@ -19,6 +19,7 @@ function ModalReserva({ clientes, mascotas, servicios, groomers, onClose, onSave
   const [groomersFiltrados, setGroomersFiltrados] = useState(groomers);
   const [cargandoGroomers, setCargandoGroomers] = useState(false);
   const [mensajeGroomers, setMensajeGroomers] = useState('');
+  const [duracionEstimada, setDuracionEstimada] = useState(null);
   const [loading, setLoading] = useState(false);
   const [metodoPago, setMetodoPago] = useState('');
   const [registrandoPago, setRegistrandoPago] = useState(false);
@@ -38,6 +39,7 @@ function ModalReserva({ clientes, mascotas, servicios, groomers, onClose, onSave
         setCargandoGroomers(false);
         setGroomersFiltrados(groomers);
         setMensajeGroomers('');
+        setDuracionEstimada(null);
         return;
       }
 
@@ -45,7 +47,7 @@ function ModalReserva({ clientes, mascotas, servicios, groomers, onClose, onSave
       try {
         const { data } = await api.get('/disponibilidad', {
           params: {
-            fecha_inicio: form.fecha_inicio,
+            fecha_inicio: new Date(form.fecha_inicio).toISOString(),
             servicio_id: form.servicio_id,
             mascota_id: form.mascota_id,
           },
@@ -55,6 +57,23 @@ function ModalReserva({ clientes, mascotas, servicios, groomers, onClose, onSave
 
         const groomersConEstado = data.data || [];
         setGroomersFiltrados(groomersConEstado);
+        // Calcular duración estimada usando fecha_fin devuelta por el endpoint
+        if (data && data.fecha_fin) {
+          try {
+            const inicio = new Date(form.fecha_inicio);
+            const fin = new Date(data.fecha_fin);
+            if (!Number.isNaN(inicio.getTime()) && !Number.isNaN(fin.getTime()) && fin > inicio) {
+              const mins = Math.round((fin.getTime() - inicio.getTime()) / 60000);
+              setDuracionEstimada(mins);
+            } else {
+              setDuracionEstimada(null);
+            }
+          } catch (e) {
+            setDuracionEstimada(null);
+          }
+        } else {
+          setDuracionEstimada(null);
+        }
         setMensajeGroomers(groomersConEstado.some(g => g.disponible)
           ? ''
           : 'No hay groomers disponibles para ese horario. Puedes ver cuáles están ocupados.'
@@ -69,6 +88,7 @@ function ModalReserva({ clientes, mascotas, servicios, groomers, onClose, onSave
         if (cancelado) return;
         setGroomersFiltrados(groomers.map(g => ({ ...g, disponible: false, motivo_disponibilidad: 'No se pudo calcular la disponibilidad.' })));
         setMensajeGroomers(err.response?.data?.error || 'No se pudo calcular la disponibilidad.');
+        setDuracionEstimada(null);
       } finally {
         if (!cancelado) setCargandoGroomers(false);
       }
@@ -94,7 +114,12 @@ function ModalReserva({ clientes, mascotas, servicios, groomers, onClose, onSave
     e.preventDefault();
     setLoading(true);
     try {
-      const { data } = await api.post('/reservas', form);
+      const payload = {
+        ...form,
+        fecha_inicio: new Date(form.fecha_inicio).toISOString(),
+      };
+
+      const { data } = await api.post('/reservas', payload);
       let pagoFallido = false;
 
       if (puedeElegirPago && metodoPago) {
@@ -154,7 +179,7 @@ function ModalReserva({ clientes, mascotas, servicios, groomers, onClose, onSave
               <label className="form-label">Servicio</label>
               <select className="form-control" value={form.servicio_id} onChange={f('servicio_id')} required>
                 <option value="">— Seleccionar servicio —</option>
-                {servicios.map(s => <option key={s.id} value={s.id}>{s.nombre} ({s.duracion_min} min — S/ {s.precio_base})</option>)}
+                {servicios.map(s => <option key={s.id} value={s.id}>{s.nombre} ({s.duracion_min} min — Bs. {s.precio_base})</option>)}
               </select>
             </div>
             <div className="form-group">
@@ -182,9 +207,14 @@ function ModalReserva({ clientes, mascotas, servicios, groomers, onClose, onSave
               <div className="form-group">
                 <label className="form-label">Fecha y hora</label>
                 <input className="form-control" type="datetime-local" value={form.fecha_inicio} onChange={f('fecha_inicio')} required />
+                {duracionEstimada !== null && (
+                  <div style={{ marginTop: 8, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                    Duración estimada: <strong>{duracionEstimada} min</strong>
+                  </div>
+                )}
               </div>
               <div className="form-group">
-                <label className="form-label">Precio acordado (S/)</label>
+                <label className="form-label">Precio acordado (Bs.)</label>
                 <input className="form-control" type="number" step="0.01" value={form.precio_acordado} onChange={f('precio_acordado')} placeholder="0.00" />
               </div>
             </div>
@@ -220,7 +250,7 @@ function ModalReserva({ clientes, mascotas, servicios, groomers, onClose, onSave
                     </div>
                     <div style={{ marginTop: 14 }}>
                       <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 6 }}>
-                        Monto estimado: <strong style={{ color: 'var(--text-primary)' }}>S/ {montoPago.toFixed(2)}</strong>
+                        Monto estimado: <strong style={{ color: 'var(--text-primary)' }}>Bs. {montoPago.toFixed(2)}</strong>
                       </div>
                       {metodoPago === 'efectivo' && (
                         <div style={{ padding: 14, borderLeft: '4px solid var(--primary)', background: 'rgba(59,130,246,0.08)', borderRadius: 8 }}>
@@ -334,7 +364,7 @@ function ModalReprogramar({ reserva, servicios, mascotas, groomers, onClose, onS
         const mascotaId = reserva.mascota_id;
         const { data } = await api.get('/disponibilidad', {
           params: {
-            fecha_inicio: form.fecha_inicio,
+            fecha_inicio: new Date(form.fecha_inicio).toISOString(),
             servicio_id: servicioId,
             mascota_id: mascotaId,
           }
@@ -431,6 +461,10 @@ function ModalReprogramar({ reserva, servicios, mascotas, groomers, onClose, onS
 function ModalPagoCliente({ reserva, onClose, onSaved }) {
   const [metodoPago, setMetodoPago] = useState('');
   const [loading, setLoading] = useState(false);
+  const [couponCode, setCouponCode] = useState('');
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
+  const [appliedPromo, setAppliedPromo] = useState(null);
+  const [discountAmount, setDiscountAmount] = useState(0);
 
   const monto = Number(reserva.precio_acordado || 0);
   const codigoQR = `PAWSPA|${reserva.id}|${monto.toFixed(2)}|${metodoPago || 'qr'}`;
@@ -443,14 +477,21 @@ function ModalPagoCliente({ reserva, onClose, onSaved }) {
 
     setLoading(true);
     try {
-      await api.post('/reservas/pagos', {
+      const payload = {
         slot_id: reserva.id,
-        monto,
+        monto: monto - (Number(discountAmount) || 0),
         tipo_pago: metodoPago,
         notas: metodoPago === 'qr'
           ? 'Pago posterior por QR registrado por el cliente.'
           : 'Pago posterior en efectivo registrado por el cliente.'
-      });
+      };
+
+      if (appliedPromo && discountAmount > 0) {
+        payload.promocion_codigo = appliedPromo.codigo || appliedPromo.id;
+        payload.descuento = discountAmount;
+      }
+
+      await api.post('/reservas/pagos', payload);
 
       toast.success('Pago registrado ✅');
       onSaved();
@@ -458,6 +499,23 @@ function ModalPagoCliente({ reserva, onClose, onSaved }) {
       toast.error(err.response?.data?.error || 'No se pudo registrar el pago.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const aplicarCoupon = async () => {
+    if (!couponCode) return;
+    setApplyingCoupon(true);
+    try {
+      const { data } = await api.post('/descuentos/apply', { codigo: couponCode.trim(), cliente_id: reserva.cliente_id || null, total: monto, items: [] });
+      setAppliedPromo(data.promocion || null);
+      setDiscountAmount(data.descuento || 0);
+      toast.success('Descuento aplicado ✅');
+    } catch (err) {
+      setAppliedPromo(null);
+      setDiscountAmount(0);
+      toast.error(err.response?.data?.error || 'No se pudo aplicar el descuento.');
+    } finally {
+      setApplyingCoupon(false);
     }
   };
 
@@ -506,9 +564,24 @@ function ModalPagoCliente({ reserva, onClose, onSaved }) {
             </button>
           </div>
 
-          <div style={{ marginBottom: 14, color: 'var(--text-muted)' }}>
-            Monto: <strong style={{ color: 'var(--text-primary)' }}>S/ {monto.toFixed(2)}</strong>
+            <div style={{ marginBottom: 14, color: 'var(--text-muted)' }}>
+            Monto: <strong style={{ color: 'var(--text-primary)' }}>Bs. {monto.toFixed(2)}</strong>
           </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <label className="form-label">Código de descuento (opcional)</label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input className="form-control" placeholder="Ingrese código" value={couponCode} onChange={e => setCouponCode(e.target.value)} />
+                <button className="btn btn-secondary" onClick={aplicarCoupon} disabled={applyingCoupon || !couponCode}>
+                  {applyingCoupon ? 'Aplicando...' : 'Aplicar'}
+                </button>
+              </div>
+              {appliedPromo && (
+                <div style={{ marginTop: 8, color: 'var(--success)', fontSize: '0.9rem' }}>
+                  Aplicado: {appliedPromo.nombre} — Descuento Bs. {Number(discountAmount).toFixed(2)}
+                </div>
+              )}
+            </div>
 
           {metodoPago === 'efectivo' && (
             <div style={{ padding: 14, borderLeft: '4px solid var(--primary)', background: 'rgba(59,130,246,0.08)', borderRadius: 8 }}>
@@ -680,7 +753,7 @@ export default function ReservasPage() {
                   {esStaff && <td style={{ fontSize:'0.85rem' }}>{r.clientes?.usuarios?.nombre} {r.clientes?.usuarios?.apellido}</td>}
                   <td style={{ fontSize:'0.85rem' }}>{r.servicios?.nombre}</td>
                   <td style={{ fontSize:'0.85rem' }}>{r.groomers?.usuarios?.nombre}</td>
-                  <td>{r.precio_acordado ? `S/ ${parseFloat(r.precio_acordado).toFixed(2)}` : '—'}</td>
+                  <td>{r.precio_acordado ? `Bs. ${parseFloat(r.precio_acordado).toFixed(2)}` : '—'}</td>
                   <td><span className={estadoBadge(r.estado)}>{r.estado}</span></td>
                   <td>
                     <div style={{ display:'flex', gap:6 }}>

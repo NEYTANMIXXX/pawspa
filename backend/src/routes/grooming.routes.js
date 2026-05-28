@@ -85,13 +85,13 @@ r.get('/agenda', autorizar('admin','recepcion','groomer'), async (req, res, next
     }
 
     const q = supabaseAdmin.from('slot_reserva')
-      .select('id, fecha_inicio, fecha_fin, estado, mascotas(id,nombre,raza,foto_url), servicios(id,nombre,duracion_min), clientes(id, usuarios(nombre,apellido)), groomers(id, usuarios(nombre,apellido))')
+      .select('id, fecha_inicio, fecha_fin, estado, mascotas(id,nombre,raza,foto_url,tamano), servicios(id,nombre,duracion_min), clientes(id, usuarios(nombre,apellido)), groomers(id, usuarios(nombre,apellido))')
       .order('fecha_inicio', { ascending: true });
 
     if (gId) q.eq('groomer_id', gId);
     if (desde) q.gte('fecha_inicio', desde);
     if (hasta) q.lte('fecha_inicio', hasta);
-    q.not('estado', 'in', '("cancelada","no_show")');
+    q.not('estado', 'in', '("cancelada","completada","no_show")');
 
     const { data, error } = await q;
     if (error) throw error;
@@ -102,10 +102,26 @@ r.get('/agenda', autorizar('admin','recepcion','groomer'), async (req, res, next
 // Checklist templates (simple hardcoded templates for now)
 const CHECKLIST_TEMPLATES = [
   { id: 'baño_basico', nombre: 'Baño básico', items: [
-    'Revisión general', 'Cepillado previo', 'Baño', 'Secado', 'Corte de uñas', 'Perfume y revisión final'
+    'Revisión general',
+    'Cepillado previo',
+    'Colocación de guantes',
+    'Aplicación de shampoo',
+    'Aplicación antipulgas',
+    'Baño',
+    'Secado',
+    'Corte de uñas',
+    'Perfume y revisión final'
   ]},
   { id: 'corte_estandar', nombre: 'Corte estándar', items: [
-    'Revisión pelaje', 'Cepillado', 'Corte general', 'Ajustes de detalles', 'Revisión de orejas', 'Entrega al cliente'
+    'Revisión pelaje',
+    'Cepillado',
+    'Colocación de guantes',
+    'Aplicación antipulgas',
+    'Corte general',
+    'Ajustes de detalles',
+    'Revisión de orejas',
+    'Perfume final',
+    'Entrega al cliente'
   ]},
 ];
 

@@ -560,7 +560,7 @@ FOR EACH ROW EXECUTE FUNCTION generar_numero_factura();
 CREATE TABLE email_verification_tokens (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     usuario_id      UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
-    token           VARCHAR(255) NOT NULL UNIQUE,
+    token           TEXT NOT NULL UNIQUE,
     email           VARCHAR(255) NOT NULL,
     usado           BOOLEAN NOT NULL DEFAULT FALSE,
     usado_en        TIMESTAMPTZ,

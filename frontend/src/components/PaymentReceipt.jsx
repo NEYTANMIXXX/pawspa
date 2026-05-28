@@ -17,7 +17,8 @@ export default function PaymentReceipt({ pago, onClose }) {
   const tipoMetodo = {
     efectivo: '💵 Pago en tienda',
     qr: '📱 Código QR',
-    transferencia: '🏦 Transferencia bancaria'
+    transferencia: '🏦 Transferencia bancaria',
+    otros: '💳 Otro método'
   };
 
   return (
@@ -91,7 +92,7 @@ export default function PaymentReceipt({ pago, onClose }) {
                 }}
               >
                 <span>Subtotal:</span>
-                <span>S/ {pago.subtotal.toFixed(2)}</span>
+                <span>Bs. {pago.subtotal.toFixed(2)}</span>
               </div>
               {pago.descuento > 0 && (
                 <div
@@ -104,7 +105,7 @@ export default function PaymentReceipt({ pago, onClose }) {
                   }}
                 >
                   <span>Descuento:</span>
-                  <span>- S/ {pago.descuento.toFixed(2)}</span>
+                  <span>- Bs. {pago.descuento.toFixed(2)}</span>
                 </div>
               )}
               {pago.impuestos > 0 && (
@@ -117,7 +118,7 @@ export default function PaymentReceipt({ pago, onClose }) {
                   }}
                 >
                   <span>Impuestos:</span>
-                  <span>S/ {pago.impuestos.toFixed(2)}</span>
+                  <span>Bs. {pago.impuestos.toFixed(2)}</span>
                 </div>
               )}
               <div
@@ -132,7 +133,7 @@ export default function PaymentReceipt({ pago, onClose }) {
                 }}
               >
                 <span>Total pagado:</span>
-                <span>S/ {pago.total.toFixed(2)}</span>
+                <span>Bs. {pago.total.toFixed(2)}</span>
               </div>
             </div>
           </div>

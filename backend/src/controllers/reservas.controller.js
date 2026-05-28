@@ -360,7 +360,7 @@ const crear = async (req, res, next) => {
 
     if (error) throw error;
 
-    // Enviar correo de confirmación al cliente (si tiene email)
+    // Enviar notificación al cliente según el estado de la reserva
     try {
       const { data: clienteInfo } = await supabaseAdmin
         .from('clientes')
@@ -374,20 +374,38 @@ const crear = async (req, res, next) => {
 
       if (email) {
         const enlaceReserva = `${process.env.FRONTEND_URL || ''}/reservas/${data.id}`;
-        await enviarNotificacionReserva({
-          to: email,
-          asunto: 'Reserva confirmada — PawSpa',
-          html: `
-            <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937">
-              <h2>Hola ${nombreCliente || ''}</h2>
-              <p>Tu reserva para <strong>${nombreMascota}</strong> quedó confirmada para el <strong>${new Date(data.fecha_inicio).toLocaleString()}</strong>.</p>
-              <p>Ver detalles: <a href="${enlaceReserva}">${enlaceReserva}</a></p>
-            </div>
-          `
-        });
+
+        if (data.estado === 'pendiente') {
+          // Solicitud en revisión
+          await enviarNotificacionReserva({
+            to: email,
+            asunto: 'Solicitud recibida — PawSpa',
+            html: `
+              <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937">
+                <h2>Hola ${nombreCliente || ''}</h2>
+                <p>Hemos recibido tu solicitud de reserva para <strong>${nombreMascota}</strong> el <strong>${new Date(data.fecha_inicio).toLocaleString()}</strong>.</p>
+                <p>Tu solicitud está en revisión por el equipo de recepción y te notificaremos cuando sea aprobada.</p>
+                <p>Ver detalles: <a href="${enlaceReserva}">${enlaceReserva}</a></p>
+              </div>
+            `
+          });
+        } else if (data.estado === 'confirmada') {
+          // Reserva confirmada
+          await enviarNotificacionReserva({
+            to: email,
+            asunto: 'Reserva confirmada — PawSpa',
+            html: `
+              <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937">
+                <h2>Hola ${nombreCliente || ''}</h2>
+                <p>Tu reserva para <strong>${nombreMascota}</strong> quedó confirmada para el <strong>${new Date(data.fecha_inicio).toLocaleString()}</strong>.</p>
+                <p>Ver detalles: <a href="${enlaceReserva}">${enlaceReserva}</a></p>
+              </div>
+            `
+          });
+        }
       }
     } catch (emailErr) {
-      console.error('[reservas] error enviando correo de confirmación:', emailErr.message || emailErr);
+      console.error('[reservas] error enviando correo de notificación tras crear reserva:', emailErr.message || emailErr);
     }
 
     return res.status(201).json({
@@ -426,10 +444,56 @@ const actualizarEstado = async (req, res, next) => {
       .from('slot_reserva')
       .update({ estado })
       .eq('id', req.params.id)
-      .select()
+      .select('*, mascotas (nombre)')
       .single();
 
     if (error) throw error;
+    // Enviar notificaciones si el estado cambió a alguno relevante
+    try {
+      const { data: clienteInfo } = await supabaseAdmin
+        .from('clientes')
+        .select('id, usuarios (email, nombre)')
+        .eq('id', data.cliente_id)
+        .single();
+
+      const email = clienteInfo?.usuarios?.email;
+      const nombreCliente = clienteInfo?.usuarios?.nombre;
+      const nombreMascota = data?.mascotas?.nombre || '';
+
+      if (email) {
+        const enlaceReserva = `${process.env.FRONTEND_URL || ''}/reservas/${data.id}`;
+
+        if (data.estado === 'confirmada') {
+          await enviarNotificacionReserva({
+            to: email,
+            asunto: 'Cita confirmada — PawSpa',
+            html: `
+              <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937">
+                <h2>Hola ${nombreCliente || ''}</h2>
+                <p>Tu cita para <strong>${nombreMascota}</strong> ha sido aprobada y confirmada para el <strong>${new Date(data.fecha_inicio).toLocaleString()}</strong>.</p>
+                <p>Ver detalles: <a href="${enlaceReserva}">${enlaceReserva}</a></p>
+              </div>
+            `
+          });
+        }
+
+        if (data.estado === 'completada') {
+          await enviarNotificacionReserva({
+            to: email,
+            asunto: 'Listo para recoger — PawSpa',
+            html: `
+              <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937">
+                <h2>Hola ${nombreCliente || ''}</h2>
+                <p>La ficha de grooming para <strong>${nombreMascota}</strong> ha sido cerrada y tu mascota está lista para ser recogida.</p>
+                <p>Ver detalles: <a href="${enlaceReserva}">${enlaceReserva}</a></p>
+              </div>
+            `
+          });
+        }
+      }
+    } catch (notifyErr) {
+      console.error('[reservas] error enviando notificación por cambio de estado:', notifyErr.message || notifyErr);
+    }
     return res.json({ mensaje: 'Estado actualizado.', data });
   } catch (err) { next(err); }
 };
@@ -782,7 +846,7 @@ const registrarPago = async (req, res, next) => {
       return res.status(400).json({ error: 'slot_id, monto y tipo_pago son obligatorios.' });
     }
 
-    const tiposValidos = ['efectivo', 'qr', 'transferencia'];
+    const tiposValidos = ['efectivo', 'qr', 'transferencia', 'otros'];
     if (!tiposValidos.includes(tipo_pago)) {
       return res.status(400).json({ error: `tipo_pago debe ser: ${tiposValidos.join(', ')}.` });
     }
@@ -839,9 +903,9 @@ const registrarPago = async (req, res, next) => {
         slot_id,
         numero_factura: `FAC-${Date.now()}`,
         subtotal: monto,
-        descuento: 0,
-        impuestos: 0,
-        total: monto,
+        descuento: req.body.descuento || 0,
+        impuestos: req.body.impuestos || 0,
+        total: req.body.total || monto,
         tipo_pago,
         estado: 'pendiente',
         fecha_pago: new Date().toISOString(),
@@ -858,10 +922,164 @@ const registrarPago = async (req, res, next) => {
       .update({ estado: 'confirmada' })
       .eq('id', slot_id);
 
+      // Registrar redención de promoción si aplica
+      try {
+        const promocionId = req.body.promocion_id || null;
+        let promoIdToInsert = promocionId;
+        if (!promoIdToInsert && req.body.promocion_codigo) {
+          const { data: promos } = await supabaseAdmin.from('promocion').select('id').eq('codigo', req.body.promocion_codigo).limit(1);
+          if (promos && promos[0]) promoIdToInsert = promos[0].id;
+        }
+
+        const montoDescuento = Number(req.body.descuento || 0);
+        if (promoIdToInsert && pago && montoDescuento > 0) {
+          await supabaseAdmin.from('promocion_redencion').insert({
+            promocion_id: promoIdToInsert,
+            cliente_id: slot.cliente_id,
+            pedido_id: pago.id,
+            monto_descuento: montoDescuento
+          });
+        }
+      } catch (promoErr) {
+        console.error('[promocion] error registrando redención:', promoErr.message || promoErr);
+      }
+
+      // Registrar movimiento de caja para este pago
+      try {
+        if (pago && pago.id) {
+          await supabaseAdmin.from('movimiento_caja').insert({
+            pago_id: pago.id,
+            pedido_id: null,
+            tipo_movimiento: 'ingreso',
+            metodo_pago: tipo_pago,
+            monto: pago.total || monto,
+            referencia: `Pago slot ${slot_id}`,
+            creado_por: req.usuario.id
+          });
+        }
+      } catch (movErr) {
+        console.error('[caja] error registrando movimiento:', movErr.message || movErr);
+      }
+
+      // Generar comprobante PDF y guardar URL en pago_factura
+      try {
+        const { generatePdfAndUpload } = require('../services/pdf.service');
+        const pagoObj = pago;
+        const html = `
+          <html><head><meta charset="utf-8"><title>Recibo ${pagoObj.numero_factura}</title></head><body>
+          <h1>Recibo de pago</h1>
+          <p>Factura: ${pagoObj.numero_factura}</p>
+          <p>Monto: ${Number(pagoObj.total).toFixed(2)}</p>
+          <p>Método: ${pagoObj.tipo_pago}</p>
+          <p>Fecha: ${pagoObj.fecha_pago}</p>
+          </body></html>
+        `;
+        const pdfPath = `recibos/${pagoObj.id}.pdf`;
+        const publicUrl = await generatePdfAndUpload({ html, bucket: 'documentos', path: pdfPath });
+        if (publicUrl) {
+          const { error: updErr } = await supabaseAdmin.from('pago_factura').update({ comprobante_url: publicUrl }).eq('id', pagoObj.id);
+          if (updErr) console.error('[pago] no se pudo actualizar comprobante_url:', updErr.message || updErr);
+          pago.comprobante_url = publicUrl;
+        }
+      } catch (pdfErr) {
+        console.error('[pago] error generando comprobante PDF:', pdfErr.message || pdfErr);
+      }
+
+      // Enviar comprobante por email al cliente (si tiene email)
+      try {
+        const { data: clienteInfo } = await supabaseAdmin.from('clientes').select('id, usuarios (email, nombre)').eq('id', slot.cliente_id).single();
+        const email = clienteInfo?.usuarios?.email;
+        const nombre = clienteInfo?.usuarios?.nombre;
+        if (email && pago.comprobante_url) {
+          const html = `
+            <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937">
+              <h2>Hola ${nombre || ''}</h2>
+              <p>Gracias por tu pago. Puedes descargar tu recibo aquí:</p>
+              <p><a href="${pago.comprobante_url}">Descargar comprobante</a></p>
+              <p>Factura: <strong>${pago.numero_factura}</strong></p>
+              <p>Monto: <strong>Bs. ${Number(pago.total).toFixed(2)}</strong></p>
+            </div>
+          `;
+          await enviarNotificacionReserva({ to: email, asunto: 'Recibo de pago — PawSpa', html });
+        }
+      } catch (emailErr) {
+        console.error('[pago] error enviando comprobante por email:', emailErr.message || emailErr);
+      }
+
     return res.status(201).json({
       mensaje: 'Pago registrado exitosamente.',
       data: pago
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const enviarComprobante = async (req, res, next) => {
+  try {
+    const pagoId = req.params.id;
+    const { rol, id: usuarioId } = req.usuario;
+
+    const { data: pago, error: pagoErr } = await supabaseAdmin
+      .from('pago_factura')
+      .select(`*, clientes (id, usuarios (email, nombre)), slot_reserva:slot_id (id, mascotas (nombre))`)
+      .eq('id', pagoId)
+      .single();
+
+    if (pagoErr || !pago) return res.status(404).json({ error: 'Pago no encontrado.' });
+
+    // Si es cliente, validar propiedad
+    if (rol === 'cliente') {
+      const { data: cliente } = await supabaseAdmin.from('clientes').select('id').eq('usuario_id', usuarioId).single();
+      if (!cliente || cliente.id !== pago.cliente_id) return res.status(403).json({ error: 'No tienes permiso para enviar este comprobante.' });
+    }
+
+    let publicUrl = pago.comprobante_url;
+    // Generar PDF si no existe
+    if (!publicUrl) {
+      try {
+        const { generatePdfAndUpload } = require('../services/pdf.service');
+        const html = `
+          <html><head><meta charset="utf-8"><title>Recibo ${pago.numero_factura}</title></head><body>
+          <h1>Recibo de pago</h1>
+          <p>Factura: ${pago.numero_factura}</p>
+          <p>Monto: ${Number(pago.total).toFixed(2)}</p>
+          <p>Método: ${pago.tipo_pago}</p>
+          <p>Fecha: ${pago.fecha_pago}</p>
+          </body></html>
+        `;
+        const pdfPath = `recibos/${pago.id}.pdf`;
+        publicUrl = await generatePdfAndUpload({ html, bucket: 'documentos', path: pdfPath });
+        if (publicUrl) {
+          const { error: updErr } = await supabaseAdmin.from('pago_factura').update({ comprobante_url: publicUrl }).eq('id', pago.id);
+          if (updErr) console.error('[pago] no se pudo actualizar comprobante_url:', updErr.message || updErr);
+        }
+      } catch (e) {
+        console.error('[comprobante] error generando PDF:', e.message || e);
+      }
+    }
+
+    // Enviar email si hay destinatario
+    try {
+      const email = pago.clientes?.usuarios?.email;
+      const nombre = pago.clientes?.usuarios?.nombre;
+      if (!email) return res.status(400).json({ error: 'Cliente no tiene email registrado.' });
+      const html = `
+        <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937">
+          <h2>Hola ${nombre || ''}</h2>
+          <p>Adjuntamos el comprobante de tu pago.</p>
+          ${publicUrl ? `<p><a href="${publicUrl}">Descargar comprobante</a></p>` : `<p>El comprobante no está disponible.</p>`}
+          <p>Factura: <strong>${pago.numero_factura}</strong></p>
+          <p>Monto: <strong>Bs. ${Number(pago.total).toFixed(2)}</strong></p>
+        </div>
+      `;
+      await enviarNotificacionReserva({ to: email, asunto: 'Recibo de pago — PawSpa', html });
+    } catch (mailErr) {
+      console.error('[comprobante] error enviando email:', mailErr.message || mailErr);
+      return res.status(500).json({ error: 'Error enviando email.' });
+    }
+
+    return res.json({ mensaje: 'Comprobante enviado.' });
   } catch (err) {
     next(err);
   }
@@ -883,4 +1101,6 @@ module.exports = {
   actualizarEstadoPago,
   historial,
   enviarRecordatorios
+  ,
+  enviarComprobante
 };

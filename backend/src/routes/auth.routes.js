@@ -4,7 +4,7 @@
 const express = require('express');
 const { body, validationResult } = require('express-validator');
 const router  = express.Router();
-const { registrar, login, logout, perfil, forgotPassword, sendVerificationEmail, verifyEmail, verify2faLogin, setup2fa, verify2fa } = require('../controllers/auth.controller');
+const { registrar, login, logout, perfil, forgotPassword, resetPassword, sendVerificationEmail, verifyEmail, verify2faLogin, setup2fa, verify2fa } = require('../controllers/auth.controller');
 const { autenticar, autorizar } = require('../middleware/auth.middleware');
 const { validarComplejidad, obtenerMensajeError } = require('../utils/passwordValidator');
 
@@ -62,6 +62,13 @@ router.post('/forgot-password', [
     .withMessage('Email inválido'),
   validar,
 ], forgotPassword); 
+
+// POST /api/auth/reset-password
+router.post('/reset-password', [
+  body('token').notEmpty().withMessage('Token requerido'),
+  body('password').notEmpty().withMessage('Nueva contraseña requerida'),
+  validar,
+], resetPassword);
 
 // POST /api/auth/email/send-verification - Envía token de verificación
 router.post('/email/send-verification', [

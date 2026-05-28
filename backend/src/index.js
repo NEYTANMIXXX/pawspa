@@ -16,9 +16,14 @@ const serviciosRoutes   = require('./routes/servicios.routes');
 const reservasRoutes    = require('./routes/reservas.routes');
 const groomingRoutes    = require('./routes/grooming.routes');
 const productosRoutes   = require('./routes/productos.routes');
+const tiendaRoutes      = require('./routes/tienda.routes');
+const categoriasRoutes  = require('./routes/categorias.routes');
+const promocionesRoutes = require('./routes/promociones.routes');
+const descuentosRoutes = require('./routes/descuentos.routes');
 const dashboardRoutes   = require('./routes/dashboard.routes');
 const groomersRoutes = require('./routes/groomers.routes');
 const disponibilidadRoutes = require('./routes/disponibilidad.routes');
+const cajaRoutes = require('./routes/caja.routes');
 
 const app = express();
 
@@ -60,9 +65,14 @@ app.use('/api/servicios',  serviciosRoutes);
 app.use('/api/reservas',   reservasRoutes);
 app.use('/api/grooming',   groomingRoutes);
 app.use('/api/groomers', groomersRoutes);
+app.use('/api/categorias', categoriasRoutes);
+app.use('/api/tienda', tiendaRoutes);
 app.use('/api/productos',  productosRoutes);
+app.use('/api/promociones', promocionesRoutes);
+app.use('/api/descuentos', descuentosRoutes);
 app.use('/api/dashboard',  dashboardRoutes);
 app.use('/api/disponibilidad', disponibilidadRoutes);
+app.use('/api/caja', cajaRoutes);
 
 
 // ── Manejo de errores global ────────────────────────────────

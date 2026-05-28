@@ -14,6 +14,7 @@ router.delete('/bloqueos/:id', autorizar('admin','recepcion'), ctrl.eliminarBloq
 router.get('/pagos', autorizar('admin','recepcion'), ctrl.listarPagos);
 router.post('/pagos', autorizar('admin','recepcion','cliente'), ctrl.registrarPago);
 router.patch('/pagos/:id/estado', autorizar('admin','recepcion'), ctrl.actualizarEstadoPago);
+router.post('/pagos/:id/enviar-comprobante', autorizar('admin','recepcion','cliente'), ctrl.enviarComprobante);
 router.get('/:id', ctrl.obtener);
 router.post('/', autorizar('admin','recepcion','cliente'), ctrl.crear);
 router.patch('/:id/reprogramar', autorizar('admin','recepcion','cliente'), ctrl.reprogramar);

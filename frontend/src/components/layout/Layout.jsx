@@ -7,12 +7,16 @@ import { useAuth } from '../../context/AuthContext';
 
 const NAV_ITEMS = [
   { to: '/dashboard', icon: '📊', label: 'Dashboard',   roles: ['admin','recepcion','groomer','cliente'] },
+  { to: '/calendario', icon: '🗓️', label: 'Calendario', roles: ['admin','recepcion'] },
   { to: '/mascotas',  icon: '🐾', label: 'Mascotas',    roles: ['admin','recepcion','groomer','cliente'] },
+  { to: '/tienda',    icon: '🛍️', label: 'Tienda',      roles: ['admin','recepcion','groomer','cliente'] },
   { to: '/reservas',  icon: '📅', label: 'Reservas',    roles: ['admin','recepcion','groomer','cliente'] },
   { to: '/pagos',     icon: '💳', label: 'Pagos',       roles: ['admin','recepcion'] },
+  { to: '/descuentos', icon: '🎟️', label: 'Descuentos', roles: ['admin','recepcion'] },
   { to: '/grooming',  icon: '✂️', label: 'Grooming',    roles: ['admin','recepcion','groomer'] },
   { to: '/usuarios',  icon: '👥', label: 'Usuarios',    roles: ['admin'] },
   { to: '/two-factor-setup', icon: '🔐', label: '2FA Admin', roles: ['admin'] },
+  { to: '/reports', icon: '📈', label: 'Reportes', roles: ['admin'] },
 ];
 
 const rolLabel = { admin: 'Administrador', recepcion: 'Recepcionista', groomer: 'Groomer', cliente: 'Cliente' };
@@ -27,12 +31,15 @@ export default function Layout() {
 
   const titleMap = {
     '/dashboard': 'Dashboard',
+    '/calendario': 'Calendario',
     '/mascotas':  'Gestión de Mascotas',
+    '/tienda':    'Tienda',
     '/reservas':  'Reservas & Citas',
     '/pagos':     'Registro de Pagos',
     '/grooming':  'Panel Grooming',
     '/usuarios':  'Gestión de Usuarios',
     '/two-factor-setup': '2FA de Administrador',
+    '/reports': 'Reportes',
   };
 
   return (

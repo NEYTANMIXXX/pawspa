@@ -153,6 +153,8 @@ SMTP_PASS=tu_password_smtp
 SMTP_FROM=PawSpa <tu_correo@dominio.com>
 ```
 
+Si vas a usar Gmail, `SMTP_PASS` debe ser una contraseña de aplicación, no tu contraseña normal de Google.
+
 ```bash
 # 4. Ejecutar en modo desarrollo
 npm run dev
@@ -181,6 +183,7 @@ Editar `.env`:
 REACT_APP_API_URL=http://localhost:4000/api
 REACT_APP_SUPABASE_URL=https://TU_PROYECTO.supabase.co
 REACT_APP_SUPABASE_ANON_KEY=tu_anon_key
+REACT_APP_TURNSTILE_SITE_KEY=tu_site_key_de_turnstile
 ```
 
 ```bash
